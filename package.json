@@ -23,6 +23,6 @@
   },
   "dependencies": {
     "deepslate": "^0.16.1",
-    "paco": "^0.4.0"
+    "pako": "^2.1.0"
   }
 }
