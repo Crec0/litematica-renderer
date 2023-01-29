@@ -76,15 +76,47 @@
         return new TextureAtlas(atlasData, idMap);
     };
 
+    const fetchLitematicFromLink: () => Promise<
+        ReadableStream<Uint8Array>
+    > = async () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        let url: string = null;
+        if (urlParams.has("remote-url")) {
+            url = urlParams.get("remote-url");
+        } else if (urlParams.has("url")) {
+            url = urlParams.get("url");
+        }
+
+        if (url != null) {
+            // This fetch is weird. 
+            // If you call it the "normal" way with `fetch(url, { mode: "cors", method:"GET"})`,
+            // It will result in a cors error.
+            // However, doing it this way works but causes error/red squiggly in vscode. IDK
+            // If you find a fix, please fix this. 
+            // This cors issue is also only for discord attachments. Maybe because it's from localhost? not sure.
+            const response = await fetch({url, mode: "cors"});
+            if (response.status == 200) {
+                return response.body;
+            }
+            console.log(response.status, response, url);
+        }
+        return new Promise((resolve) => resolve(null));
+    };
+
     const fetchData = Promise.all([
         fetchBlockDefinitions(),
         fetchBlockModels(),
         fetchAndMakeTextureAtlas(),
+        fetchLitematicFromLink(),
     ]);
 </script>
 
 {#await fetchData}
-    Loading Data...
-{:then [blockDefinitions, models, textureAtlas]}
-    <Viewer {blockDefinitions} {models} {textureAtlas} />
+    <p>Loading Data...</p>
+{:then [blockDefinitions, models, textureAtlas, fileBytes]}
+    <Viewer {blockDefinitions} {models} {textureAtlas} {fileBytes} />
+{:catch error}
+<!-- TODO replace this with an error component. -->
+    <p>An error occured:</p>
+    <p>{error}</p>
 {/await}
