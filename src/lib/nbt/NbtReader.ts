@@ -32,7 +32,9 @@ export class NbtReader {
     }
 
     long(_unused: boolean = false) {
-        return [this.int(), this.int()]
+        const num = this.buffer.getBigInt64(this.offset);
+        this.offset += 8;
+        return num
     }
 
     float(_unused: boolean = false) {
@@ -42,7 +44,9 @@ export class NbtReader {
     }
 
     double(_unused: boolean = false) {
-        return [this.float(), this.float()]
+        const num = this.buffer.getFloat64(this.offset);
+        this.offset += 8;
+        return num
     }
 
     byteArray(_unused: boolean = false) {
@@ -64,7 +68,7 @@ export class NbtReader {
     }
 
     longArray(_unused: boolean = false) {
-        const array: number[][] = [];
+        const array: bigint[] = [];
         const length = this.int()
         for (let i = 0; i < length; i++) {
             array.push(this.long())
