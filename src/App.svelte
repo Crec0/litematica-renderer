@@ -1,5 +1,9 @@
 <script lang="ts">
     import Viewer from "./lib/Viewer.svelte";
+    import blockModelsJson from "./assets/block-models.json"
+    import blockDefitionsJson from "./assets/block-definitions.json"
+    import atlasJson from "./assets/atlas.json"
+    // import ThreeJSViewer from "./lib/ThreeJSViewer.svelte";
     import {
         BlockDefinition,
         BlockModel,
@@ -10,10 +14,11 @@
     const MCMETA = "https://raw.githubusercontent.com/misode/mcmeta/";
 
     const fetchBlockDefinitions = async () => {
-        const res = await fetch(
-            `${MCMETA}summary/assets/block_definition/data.min.json`
-        );
-        const responseJson = await res.json();
+        // const res = await fetch(
+        //     `${MCMETA}summary/assets/block_definition/data.min.json`
+        // );
+        // const responseJson = await res.json();
+        const responseJson = blockDefitionsJson;
         const blockDefinitions: Record<string, BlockDefinition> = {};
 
         Object.keys(responseJson).forEach((id) => {
@@ -27,8 +32,11 @@
     };
 
     const fetchBlockModels = async () => {
-        const res = await fetch(`${MCMETA}summary/assets/model/data.min.json`);
-        const responseJson = await res.json();
+        // const res = await fetch(`${MCMETA}summary/assets/model/data.min.json`);
+        // const responseJson = await res.json();
+
+        const responseJson = blockModelsJson;
+
         const blockModels: Record<string, BlockModel> = {};
 
         Object.keys(responseJson).forEach((id) => {
@@ -38,7 +46,7 @@
             );
         });
         Object.values(blockModels).forEach((m: any) =>
-            m.flatten({ getBlockModel: (id) => blockModels[id] })
+            m.flatten({getBlockModel: (id) => blockModels[id]})
         );
 
         return blockModels;
@@ -63,8 +71,9 @@
         const atlasData = atlasCtx.getImageData(0, 0, atlasSize, atlasSize);
         const part = 16 / atlasData.width;
 
-        const uvMapResponse = await fetch(`${MCMETA}atlas/all/data.min.json`);
-        const responseJson = await uvMapResponse.json();
+        // const uvMapResponse = await fetch(`${MCMETA}atlas/all/data.min.json`);
+        // const responseJson = await uvMapResponse.json();
+        const responseJson = atlasJson;
 
         const idMap = {};
         Object.keys(responseJson).forEach((id) => {
@@ -76,47 +85,41 @@
         return new TextureAtlas(atlasData, idMap);
     };
 
-    const fetchLitematicFromLink: () => Promise<
-        ReadableStream<Uint8Array>
-    > = async () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        let url: string = null;
-        if (urlParams.has("remote-url")) {
-            url = urlParams.get("remote-url");
-        } else if (urlParams.has("url")) {
-            url = urlParams.get("url");
-        }
-
-        if (url != null) {
-            // This fetch is weird. 
-            // If you call it the "normal" way with `fetch(url, { mode: "cors", method:"GET"})`,
-            // It will result in a cors error.
-            // However, doing it this way works but causes error/red squiggly in vscode. IDK
-            // If you find a fix, please fix this. 
-            // This cors issue is also only for discord attachments. Maybe because it's from localhost? not sure.
-            const response = await fetch({url, mode: "cors"});
-            if (response.status == 200) {
-                return response.body;
-            }
-            console.log(response.status, response, url);
-        }
-        return new Promise((resolve) => resolve(null));
-    };
+    // Disabling this until I get a proxy to bypass cors issue
+    // const fetchLitematicFromLink: () => Promise<Uint8Array> = async () => {
+    //     const urlParams = new URLSearchParams(window.location.search);
+    //     let url: string = "null";
+    //     if (urlParams.has("remote-url")) {
+    //         url = urlParams.get("remote-url");
+    //     } else if (urlParams.has("url")) {
+    //         url = urlParams.get("url");
+    //     }
+    //     if (url != null) {
+    //         const response = await fetch(url);
+    //         if (response.status == 200) {
+    //             const readResult = await response.body.getReader().read();
+    //             console.log(readResult)
+    //             return new Promise((resolve) => resolve(readResult.value));
+    //         }
+    //         console.log(response.status, response, url);
+    //     }
+    //     return new Promise((resolve) => resolve(null));
+    // };
 
     const fetchData = Promise.all([
         fetchBlockDefinitions(),
         fetchBlockModels(),
-        fetchAndMakeTextureAtlas(),
-        fetchLitematicFromLink(),
+        fetchAndMakeTextureAtlas()
     ]);
 </script>
 
 {#await fetchData}
     <p>Loading Data...</p>
-{:then [blockDefinitions, models, textureAtlas, fileBytes]}
-    <Viewer {blockDefinitions} {models} {textureAtlas} {fileBytes} />
+{:then [blockDefinitions, models, textureAtlas]}
+     <Viewer {blockDefinitions} {models} {textureAtlas} />
+<!--    <ThreeJSViewer {blockDefinitions} {models} {textureAtlas}/>-->
 {:catch error}
-<!-- TODO replace this with an error component. -->
+    <!-- TODO replace this with an error component. -->
     <p>An error occured:</p>
     <p>{error}</p>
 {/await}
