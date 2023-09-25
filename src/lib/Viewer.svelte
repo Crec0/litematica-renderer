@@ -13,7 +13,7 @@
 
     import {mat4, vec3} from "gl-matrix";
 
-    import OpaqueBlocks from './assets/OpaqueBlocks.json'
+    import OpaqueBlocks from '../assets/OpaqueBlocks.json'
 
     import {parseNbt} from "./nbt/NbtUtil";
     import type {Litematic, Region} from "./Litematic";
