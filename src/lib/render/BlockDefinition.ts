@@ -1,14 +1,14 @@
 export interface BlockDefinition {
-    variants?:  { [key: string]: VariantElement[] | VariantElement };
+    variants?:  { [key: string]: Variant[] | Variant };
     multipart?: Multipart[];
 }
 
 export interface Multipart {
-    apply: VariantElement[] | VariantElement;
+    apply: Variant[] | Variant;
     when?: When;
 }
 
-export interface VariantElement {
+export interface Variant {
     model:   string;
     weight?: number;
     uvlock?: boolean;

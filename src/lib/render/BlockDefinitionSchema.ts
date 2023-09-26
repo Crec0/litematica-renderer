@@ -1,7 +1,7 @@
 import { z } from "zod"
 import {Facing} from "./BlockDefinition";
 
-const VariantElementSchema = z.object({
+const VariantSchema = z.object({
     model: z.string(),
     weight: z.number().optional(),
     uvlock: z.boolean().optional(),
@@ -49,13 +49,13 @@ const WhenSchema = z.object({
 })
 
 const MultipartSchema = z.object({
-    apply: z.union([z.array(VariantElementSchema), VariantElementSchema]),
+    apply: z.union([z.array(VariantSchema), VariantSchema]),
     when: WhenSchema.optional()
 })
 
 export const BlockDefinitionSchema = z.object({
     variants: z
-        .record(z.union([z.array(VariantElementSchema), VariantElementSchema]))
+        .record(z.union([z.array(VariantSchema), VariantSchema]))
         .optional(),
     multipart: z.array(MultipartSchema).optional()
 })
