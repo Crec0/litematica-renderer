@@ -11,7 +11,8 @@
      * Note that setting allowJs false does not prevent the use
      * of JS in `.svelte` files.
      */
-    "allowJs": true,
+    "strict": true,
+    "allowJs": false,
     "checkJs": true,
     "isolatedModules": true
   },
