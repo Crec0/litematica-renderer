@@ -9,24 +9,24 @@ export interface BlockModel {
     textures?: { [key: string]: string };
 }
 
-interface DisplayOverrides {
-    firstperson_lefthand?: TransForms3D;
-    firstperson_righthand?: TransForms3D;
-    fixed?: TransForms3D;
-    ground?: TransForms3D;
-    gui?: TransForms3D;
-    head?: TransForms3D;
-    thirdperson_lefthand?: TransForms3D;
-    thirdperson_righthand?: TransForms3D;
+export interface DisplayOverrides {
+    firstperson_lefthand?: Transform3D;
+    firstperson_righthand?: Transform3D;
+    fixed?: Transform3D;
+    ground?: Transform3D;
+    gui?: Transform3D;
+    head?: Transform3D;
+    thirdperson_lefthand?: Transform3D;
+    thirdperson_righthand?: Transform3D;
 }
 
-interface TransForms3D {
+export interface Transform3D {
     rotation?: number[];
     scale?: number[];
     translation?: number[];
 }
 
-interface Element {
+export interface Element {
     from: number[];
     to: number[];
     faces: Faces;
@@ -36,43 +36,43 @@ interface Element {
     __comment?: string;
 }
 
-interface Faces {
-    down?: Down;
-    up?: Down;
-    north?: Down;
-    south?: Down;
-    west?: Down;
-    east?: Down;
+export interface Faces {
+    down?: Face;
+    up?: Face;
+    north?: Face;
+    south?: Face;
+    west?: Face;
+    east?: Face;
 }
 
-interface Down {
+export interface Face {
     uv?: number[];
     texture: string;
-    cullface?: Direction;
+    cullface?: FaceFacingDirection;
     rotation?: number;
     tintindex?: number;
 }
 
-interface Group {
-    name: Direction;
+export interface Group {
+    name: FaceFacingDirection;
     origin: number[];
     color: number;
     children: number[];
 }
 
-interface Rotation {
+export interface Rotation {
     origin: number[];
     axis: Axis;
     angle: number;
     rescale?: boolean;
 }
 
-interface Override {
+export interface Override {
     predicate: { [key: string]: number };
     model: string;
 }
 
-export enum Direction {
+export enum FaceFacingDirection {
     BOTTOM = "bottom",
     DOWN = "down",
     EAST = "east",
@@ -92,4 +92,3 @@ export enum GUILightType {
     FRONT = "front",
     SIDE = "side",
 }
-

@@ -1,10 +1,8 @@
 import {z} from "zod";
-import {Axis, Direction, GUILightType} from "./BlockModel";
-import {BlockDefinitionSchema} from "./BlockDefinitionSchema";
-import {expoOut} from "svelte/easing";
+import {Axis, FaceFacingDirection, GUILightType} from "./BlockModel";
 
 const AxisSchema = z.nativeEnum(Axis)
-const DirectionSchema = z.nativeEnum(Direction)
+const DirectionSchema = z.nativeEnum(FaceFacingDirection)
 const GUILightSchema = z.nativeEnum(GUILightType)
 
 const GroupSchema = z.object({
