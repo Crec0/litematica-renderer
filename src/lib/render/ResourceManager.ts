@@ -38,7 +38,7 @@ export class ResourceManager {
     getModel(name: string): BlockModel {
         const model = this.blockModels.get(name.replace("minecraft:", ""));
         if (model) {
-            return model;
+            return structuredClone(model);
         }
         throw Error(`Model doesn't exist: ${name}`)
     }
