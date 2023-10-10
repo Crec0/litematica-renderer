@@ -3,12 +3,8 @@
     import blockDefitionsJson from './assets/block-definitions.json';
     import atlasJson from './assets/atlas.json';
     // import ThreeJSViewer from "./lib/ThreeJSViewer.svelte";
-    import {
-        BlockDefinition,
-        BlockModel,
-        TextureAtlas,
-        upperPowerOfTwo,
-    } from "deepslate";
+    import { BlockDefinition, BlockModel, TextureAtlas, upperPowerOfTwo } from 'deepslate';
+    import ThreeJSViewer from './lib/ThreeJSViewer.svelte';
 
 
     const MCMETA = 'https://raw.githubusercontent.com/misode/mcmeta/';
@@ -115,9 +111,9 @@
 
 {#await fetchData}
     <p>Loading Data...</p>
-{:then [blockDefinitions, models, textureAtlas]}
-     <Viewer {blockDefinitions} {models} {textureAtlas} />
-<!--    <ThreeJSViewer {blockDefinitions} {models} {textureAtlas}/>-->
+{:then [ blockDefinitions, models, textureAtlas ]}
+    <!--     <Viewer {blockDefinitions} {models} {textureAtlas} />-->
+    <ThreeJSViewer/>
 {:catch error}
     <!-- TODO replace this with an error component. -->
     <p>An error occured:</p>
