@@ -23,10 +23,10 @@
     "vite": "^4.4.9"
   },
   "dependencies": {
-    "deepslate": "^0.16.2",
+    "deepslate": "^0.18.0",
     "gl-matrix": "^3.4.3",
     "pako": "^2.1.0",
-    "three": "^0.156.1",
+    "three": "^0.157.0",
     "zod": "^3.22.2"
   }
 }
