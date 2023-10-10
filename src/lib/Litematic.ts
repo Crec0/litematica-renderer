@@ -5,6 +5,7 @@ export interface Litematic {
     Regions: Record<string, Region>;
 }
 
+
 export interface Region {
     Size: BlockPos;
     Position: BlockPos;
@@ -16,10 +17,12 @@ export interface Region {
     PendingFluidTicks: unknown;
 }
 
+
 export interface BlockStatePalette {
     Name: string;
     Properties?: Record<string, string>;
 }
+
 
 export interface Metadata {
     Name: string;
@@ -32,6 +35,7 @@ export interface Metadata {
     TimeModified: bigint;
     EnclosingSize: BlockPos;
 }
+
 
 export interface BlockPos {
     x: number;

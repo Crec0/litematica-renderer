@@ -1,6 +1,6 @@
-import { inflate } from "pako";
-import { NbtReader } from "./NbtReader";
-import { compressionMethod, CompressionType } from "./CompressionUtil"
+import { inflate } from 'pako';
+import { NbtReader } from './NbtReader';
+import { compressionMethod, CompressionType } from './CompressionUtil';
 
 
 export const Tags = [
@@ -17,13 +17,13 @@ export const Tags = [
     'compound',
     'intArray',
     'longArray',
-]
+];
 
 export function parseNbt(byteBuffer: Uint8Array, simplified: boolean = false) {
     const uncompressedBuffer = compressionMethod(byteBuffer) == CompressionType.UNCOMPRESSED
         ? byteBuffer
         : inflate(byteBuffer);
 
-    const nbtReader = new NbtReader(uncompressedBuffer)
+    const nbtReader = new NbtReader(uncompressedBuffer);
     return nbtReader.read(simplified);
 }

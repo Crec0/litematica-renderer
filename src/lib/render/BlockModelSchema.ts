@@ -1,27 +1,28 @@
-import {z} from "zod";
-import {Axis, FaceFacingDirection, GUILightType} from "./BlockModel";
+import { z } from 'zod';
+import { Axis, FaceFacingDirection, GUILightType } from './BlockModel';
 
-const AxisSchema = z.nativeEnum(Axis)
-const DirectionSchema = z.nativeEnum(FaceFacingDirection)
-const GUILightSchema = z.nativeEnum(GUILightType)
+
+const AxisSchema = z.nativeEnum(Axis);
+const DirectionSchema = z.nativeEnum(FaceFacingDirection);
+const GUILightSchema = z.nativeEnum(GUILightType);
 
 const GroupSchema = z.object({
     name: DirectionSchema,
     origin: z.array(z.number()),
     color: z.number(),
-    children: z.array(z.number())
-})
+    children: z.array(z.number()),
+});
 
 const ItemOverrideSchema = z.object({
     predicate: z.record(z.number()),
-    model: z.string()
-})
+    model: z.string(),
+});
 
 const TransForms3DSchema = z.object({
     rotation: z.array(z.number()).optional(),
     scale: z.array(z.number()).optional(),
-    translation: z.array(z.number()).optional()
-})
+    translation: z.array(z.number()).optional(),
+});
 
 const DisplayOverrideSchema = z.object({
     firstperson_lefthand: TransForms3DSchema.optional(),
@@ -31,23 +32,23 @@ const DisplayOverrideSchema = z.object({
     gui: TransForms3DSchema.optional(),
     head: TransForms3DSchema.optional(),
     thirdperson_lefthand: TransForms3DSchema.optional(),
-    thirdperson_righthand: TransForms3DSchema.optional()
-})
+    thirdperson_righthand: TransForms3DSchema.optional(),
+});
 
 const FaceSchema = z.object({
     uv: z.array(z.number()).optional(),
     texture: z.string(),
     cullface: DirectionSchema.optional(),
     rotation: z.number().optional().default(0),
-    tintindex: z.number().optional()
-})
+    tintindex: z.number().optional(),
+});
 
 const RotationSchema = z.object({
     origin: z.array(z.number()),
     axis: AxisSchema,
     angle: z.number(),
-    rescale: z.boolean().optional().default(false)
-})
+    rescale: z.boolean().optional().default(false),
+});
 
 const FacesSchema = z.object({
     down: FaceSchema.optional(),
@@ -55,29 +56,29 @@ const FacesSchema = z.object({
     north: FaceSchema.optional(),
     south: FaceSchema.optional(),
     west: FaceSchema.optional(),
-    east: FaceSchema.optional()
-})
+    east: FaceSchema.optional(),
+});
 
-const ElementSchema = z.object({
+const QuadSchema = z.object({
     from: z.array(z.number()),
     to: z.array(z.number()),
     faces: FacesSchema,
     rotation: RotationSchema.optional(),
     shade: z.boolean().optional().default(true),
     name: z.string().optional(),
-    __comment: z.string().optional()
-})
+    __comment: z.string().optional(),
+});
 
 export const BlockModelSchema = z.object({
     ambientocclusion: z.boolean().optional().default(true),
     display: DisplayOverrideSchema.optional(),
-    elements: z.array(ElementSchema).optional(),
+    elements: z.array(QuadSchema).optional(),
     groups: z.array(GroupSchema).optional(),
     gui_light: GUILightSchema.optional().default(GUILightType.SIDE),
     overrides: z.array(ItemOverrideSchema).optional(),
     parent: z.string().optional(),
-    textures: z.record(z.string()).optional()
-})
+    textures: z.record(z.string()).optional(),
+});
 
 const blockModelMap = z.map(z.string(), BlockModelSchema);
 export type BlockModelMap = z.infer<typeof blockModelMap>

@@ -8,15 +8,15 @@
         Structure,
         StructureRenderer,
         type TextureAtlas,
-    } from "deepslate";
-    import {onMount} from "svelte";
+    } from 'deepslate';
+    import { onMount } from 'svelte';
 
-    import {mat4, vec3} from "gl-matrix";
+    import { mat4, vec3 } from 'gl-matrix';
 
-    import OpaqueBlocks from '../assets/OpaqueBlocks.json'
+    import OpaqueBlocks from '../assets/OpaqueBlocks.json';
 
-    import {parseNbt} from "./nbt/NbtUtil";
-    import type {Litematic, Region} from "./Litematic";
+    import { parseNbt } from './nbt/NbtUtil';
+    import type { Litematic, Region } from './Litematic';
 
 
     export let blockDefinitions: Record<string, BlockDefinition>;
@@ -43,7 +43,7 @@
             return textureAtlas.getTextureAtlas();
         },
         getBlockFlags(id: Identifier) {
-            return {opaque: opaqueBlockIds.has(id.toString())};
+            return { opaque: opaqueBlockIds.has(id.toString()) };
         },
         getBlockProperties(_id) {
             return null;
@@ -54,8 +54,8 @@
     };
 
     const handleFileUpload = (event: Event) => {
-        const files = (event.target as HTMLInputElement).files;
-        if (files === null || files.length == 0) {
+        const files = ( event.target as HTMLInputElement ).files;
+        if ( files === null || files.length == 0 ) {
             return;
         }
         readFile(files.item(0));
@@ -86,18 +86,18 @@
     }
 
     const onMouseDown = (evt) => {
-        if (evt.button === 0) {
+        if ( evt.button === 0 ) {
             evt.preventDefault();
-            mousePos = [evt.clientX, evt.clientY];
+            mousePos = [ evt.clientX, evt.clientY ];
         }
         requestAnimationFrame(render);
     };
 
     const onMouseMove = (evt) => {
-        if (mousePos) {
-            mat4.rotateY(rotate, rotate, (evt.clientX - mousePos[0]) / 200);
-            mat4.rotateX(rotate, rotate, (evt.clientY - mousePos[1]) / 200);
-            mousePos = [evt.clientX, evt.clientY];
+        if ( mousePos ) {
+            mat4.rotateY(rotate, rotate, ( evt.clientX - mousePos[0] ) / 200);
+            mat4.rotateX(rotate, rotate, ( evt.clientY - mousePos[1] ) / 200);
+            mousePos = [ evt.clientX, evt.clientY ];
             requestAnimationFrame(render);
         }
     };
@@ -110,7 +110,7 @@
     const renderAsStructure = (buffer: Uint8Array) => {
         minusCam = vec3.create();
         view = mat4.create();
-        const root = parseNbt(buffer, true)[""] as Litematic;
+        const root = parseNbt(buffer, true)[''] as Litematic;
 
         const enclosingSize = root.Metadata.EnclosingSize;
 
@@ -122,14 +122,14 @@
             BlockPos.create(
                 enclosingSizeLength,
                 enclosingSizeHeight,
-                enclosingSizeDepth
-            )
+                enclosingSizeDepth,
+            ),
         );
 
         const regions = root.Regions;
         let i = 0;
 
-        for (let region of Object.values(regions)) {
+        for ( let region of Object.values(regions) ) {
             populateBlocksFromRegion(structure, region, i++);
         }
 
@@ -141,14 +141,14 @@
         cameraPos = vec3.fromValues(
             0,
             0,
-            Math.max(enclosingSizeLength, enclosingSizeHeight) + enclosingSizeDepth / 2
+            Math.max(enclosingSizeLength, enclosingSizeHeight) + enclosingSizeDepth / 2,
         );
         mat4.translate(rotate, rotate, vec3.negate(minusCam, cameraPos));
         requestAnimationFrame(render);
     };
 
     function adjustRelativePosition(size: number, position: number) {
-        const relativePos = (size >= 0 ? size - 1 : size + 1) + position
+        const relativePos = ( size >= 0 ? size - 1 : size + 1 ) + position;
         return Math.max(relativePos, position) - Math.min(relativePos, position) + 1;
     }
 
@@ -160,23 +160,23 @@
         const blockStates = region.BlockStates;
 
         const bits = Math.max(2, Math.ceil(Math.log2(region.BlockStatePalette.length)));
-        const mask = BigInt((1 << bits) - 1);
+        const mask = BigInt(( 1 << bits ) - 1);
 
-        for (let y = 0; y < adjustedSizeY; y++) {
-            for (let z = 0; z < adjustedSizeZ; z++) {
-                for (let x = 0; x < adjustedSizeX; x++) {
+        for ( let y = 0; y < adjustedSizeY; y++ ) {
+            for ( let z = 0; z < adjustedSizeZ; z++ ) {
+                for ( let x = 0; x < adjustedSizeX; x++ ) {
                     const strideIndex = x + z * adjustedSizeX + y * adjustedSizeX * adjustedSizeZ;
                     const offset = strideIndex * bits;
                     const arrStartIndex = offset >>> 6;
-                    const arrEndIndex = ((strideIndex + 1) * bits - 1) >>> 6;
+                    const arrEndIndex = ( ( strideIndex + 1 ) * bits - 1 ) >>> 6;
                     const startOffset = BigInt(offset & 0x3f);
 
                     const unmaskedIndex = arrStartIndex === arrEndIndex
                         ? blockStates[arrStartIndex] >> startOffset
-                        : blockStates[arrStartIndex] >> startOffset | blockStates[arrEndIndex] << (64n - startOffset);
+                        : blockStates[arrStartIndex] >> startOffset | blockStates[arrEndIndex] << ( 64n - startOffset );
 
                     const paletteIndex = unmaskedIndex & mask;
-                    const block = region.BlockStatePalette[Number(paletteIndex)] ?? {Name: "minecraft:air"};
+                    const block = region.BlockStatePalette[Number(paletteIndex)] ?? { Name: 'minecraft:air' };
 
                     structure.addBlock(BlockPos.create(x, y, z), block.Name, block.Properties);
                 }
@@ -185,11 +185,11 @@
     }
 
     onMount(() => {
-        gl = canvasElement.getContext("webgl");
-        canvasElement.addEventListener("mousedown", onMouseDown);
-        canvasElement.addEventListener("mousemove", onMouseMove);
-        canvasElement.addEventListener("mouseup", stop);
-        canvasElement.addEventListener("mouseleave", stop);
+        gl = canvasElement.getContext('webgl');
+        canvasElement.addEventListener('mousedown', onMouseDown);
+        canvasElement.addEventListener('mousemove', onMouseMove);
+        canvasElement.addEventListener('mouseup', stop);
+        canvasElement.addEventListener('mouseleave', stop);
     });
 </script>
 
