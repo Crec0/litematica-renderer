@@ -94,10 +94,10 @@ export class ResourceManager {
          * 1168 <= 1184 (atlas height) - 16 (block height) because three.js uv's is flipped across Y axis
          */
         const ret = [
-            ( atlasOffset[0] + uvs[0] ) / 2048, ( 1184 - atlasOffset[1] - uvs[3] ) / 1184,
             ( atlasOffset[0] + uvs[2] ) / 2048, ( 1184 - atlasOffset[1] - uvs[3] ) / 1184,
-            ( atlasOffset[0] + uvs[0] ) / 2048, ( 1184 - atlasOffset[1] - uvs[1] ) / 1184,
+            ( atlasOffset[0] + uvs[0] ) / 2048, ( 1184 - atlasOffset[1] - uvs[3] ) / 1184,
             ( atlasOffset[0] + uvs[2] ) / 2048, ( 1184 - atlasOffset[1] - uvs[1] ) / 1184,
+            ( atlasOffset[0] + uvs[0] ) / 2048, ( 1184 - atlasOffset[1] - uvs[1] ) / 1184,
         ];
 
         // console.log(
@@ -136,13 +136,13 @@ export class ResourceManager {
         return this.translateUV(textureName, uvs);
     }
 
-    private variantMesh(variantName: string, variant: Variant): Mesh[] {
+    private variantMesh(blockName: string, variantName: string, variant: Variant): Mesh[] {
         const model = this.getFlattenedModel(variant.model);
         if ( !model.elements ) {
-            throw Error(`Flattened model doesn't have elements tag. Cannot render: ${ variant.model }[${ variantName }]`);
+            throw Error(`Flattened model doesn't have elements tag. Cannot render: ${ blockName }[${ variantName }]`);
         }
         if ( !model.textures ) {
-            throw Error(`Flattened model doesn't have textures. Cannot render: ${ variant.model }[${ variantName }]`);
+            throw Error(`Flattened model doesn't have textures. Cannot render: ${ blockName }[${ variantName }]`);
         }
         // Delete unnecessary stuff
         delete model.textures['particle'];
@@ -158,12 +158,12 @@ export class ResourceManager {
             const box = new BoxGeometry(( f[0] - t[0] ) / 16, ( f[1] - t[1] ) / 16, ( f[2] - t[2] ) / 16);
 
             const uvs = [
-                ...this.getUVs(model, elem.faces.north),
-                ...this.getUVs(model, elem.faces.south),
-                ...this.getUVs(model, elem.faces.up),
-                ...this.getUVs(model, elem.faces.down),
                 ...this.getUVs(model, elem.faces.east),
                 ...this.getUVs(model, elem.faces.west),
+                ...this.getUVs(model, elem.faces.down),
+                ...this.getUVs(model, elem.faces.up),
+                ...this.getUVs(model, elem.faces.north),
+                ...this.getUVs(model, elem.faces.south),
             ];
 
             box.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
@@ -192,8 +192,8 @@ export class ResourceManager {
             meshes.set(
                 variantName,
                 variations instanceof Array
-                    ? Object.values(variations).flatMap(v => this.variantMesh(variantName, v))
-                    : this.variantMesh(variantName, variations),
+                    ? Object.values(variations).flatMap(v => this.variantMesh(blockName, variantName, v))
+                    : this.variantMesh(blockName, variantName, variations),
             );
         }
 
