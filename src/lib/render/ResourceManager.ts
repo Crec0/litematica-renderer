@@ -169,10 +169,7 @@ export class ResourceManager {
             box.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
 
             const mesh = new Mesh(box, this.genericMaterial);
-
-            console.log(f, t);
-            mesh.position.add(new Vector3(( f[0] - t[0] ) / 2, 0, ( f[2] - t[2] ) / 2));
-            console.log(mesh.position);
+            mesh.position.add(new Vector3(f[0] + (f[0] - t[0]) / 2, f[1] - (f[1] - t[1]) / 2, f[2] + (f[2] - t[2]) / 2).divideScalar(16));
 
             meshes.push(mesh);
         }
