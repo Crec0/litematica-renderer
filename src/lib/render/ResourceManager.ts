@@ -11,14 +11,24 @@ import {
     BoxGeometry,
     DoubleSide,
     Float32BufferAttribute,
+    Group,
     Mesh,
     MeshBasicMaterial,
     NearestFilter,
+    Object3D,
     SRGBColorSpace,
     TextureLoader,
     Vector3,
 } from 'three';
 import type { BlockModel, Face } from './BlockModel';
+import { Axis } from './BlockModel';
+
+
+type FixedArray<
+    T,
+    N extends number,
+    R extends readonly T[] = [],
+> = R['length'] extends N ? R : FixedArray<T, N, readonly [ T, ...R ]>;
 
 
 export class ResourceManager {
@@ -28,6 +38,7 @@ export class ResourceManager {
         texture.magFilter = NearestFilter;
         texture.minFilter = NearestFilter;
         texture.colorSpace = SRGBColorSpace;
+        texture.flipY = false;
     });
 
     private genericMaterial = new MeshBasicMaterial({
@@ -78,42 +89,15 @@ export class ResourceManager {
         return model;
     }
 
-    private translateUV(textureName: string, uvs: number[]): number[] {
-        // @ts-ignore
-        const atlasOffset: number[] = ATLAS_DATA[textureName];
+    private translateUV(textureName: string, uvs: FixedArray<number, 4>): FixedArray<number, 8> {
+        const atlasOffset = ATLAS_DATA[textureName as keyof typeof ATLAS_DATA] as unknown as FixedArray<number, 4>;
 
-        /**
-         * uv order
-         * 0, 0
-         * 1, 0
-         * 0, 1
-         * 1, 1
-         *
-         * 2048 (atlas width)
-         * 1184 (atlas height)
-         * 1168 <= 1184 (atlas height) - 16 (block height) because three.js uv's is flipped across Y axis
-         */
-        const ret = [
-            ( atlasOffset[0] + uvs[2] ) / 2048, ( 1184 - atlasOffset[1] - uvs[3] ) / 1184,
-            ( atlasOffset[0] + uvs[0] ) / 2048, ( 1184 - atlasOffset[1] - uvs[3] ) / 1184,
-            ( atlasOffset[0] + uvs[2] ) / 2048, ( 1184 - atlasOffset[1] - uvs[1] ) / 1184,
-            ( atlasOffset[0] + uvs[0] ) / 2048, ( 1184 - atlasOffset[1] - uvs[1] ) / 1184,
+        return [
+            ( atlasOffset[0] + uvs[0] ) / 2048, ( atlasOffset[1] + uvs[3] ) / 1184,
+            ( atlasOffset[0] + uvs[2] ) / 2048, ( atlasOffset[1] + uvs[3] ) / 1184,
+            ( atlasOffset[0] + uvs[0] ) / 2048, ( atlasOffset[1] + uvs[1] ) / 1184,
+            ( atlasOffset[0] + uvs[2] ) / 2048, ( atlasOffset[1] + uvs[1] ) / 1184,
         ];
-
-        // console.log(
-        //     ret[0] * 2048, ret[1] * 1184,
-        //     ret[2] * 2048, ret[3] * 1184,
-        //     ret[4] * 2048, ret[5] * 1184,
-        //     ret[6] * 2048, ret[7] * 1184,
-        //     '|',
-        //     atlasOffset[0], 1168 - atlasOffset[1],
-        //     '|',
-        //     atlasOffset,
-        //     '|',
-        //     uvs,
-        // );
-
-        return ret;
     }
 
     private findTextureName(model: BlockModel, texture: string): string {
@@ -122,7 +106,7 @@ export class ResourceManager {
         }
         const cleanedName = texture.replace('#', '');
         if ( cleanedName in model.textures ) {
-            return this.findTextureName(model, model.textures[cleanedName]);
+            return this.findTextureName(model, model.textures[cleanedName]!);
         }
         return texture.replace('minecraft:', '');
     }
@@ -132,11 +116,35 @@ export class ResourceManager {
             return this.blankUV;
         }
         const textureName = this.findTextureName(model, face.texture);
-        const uvs = face.uv == null ? this.fullFaceUV : face.uv;
+        const uvs = ( face.uv == null ? this.fullFaceUV : face.uv ) as unknown as FixedArray<number, 4>;
         return this.translateUV(textureName, uvs);
     }
 
-    private variantMesh(blockName: string, variantName: string, variant: Variant): Mesh[] {
+    private rotateAboutPoint(obj: Object3D, point: Vector3, axis: Vector3, theta: number, pointIsWorld: boolean = false) {
+        if ( pointIsWorld ) {
+            obj.parent?.localToWorld(obj.position);
+        }
+        obj.position.sub(point);
+        obj.position.applyAxisAngle(axis, theta);
+        obj.position.add(point);
+        if ( pointIsWorld ) {
+            obj.parent?.worldToLocal(obj.position);
+        }
+        obj.rotateOnAxis(axis, theta);
+    }
+
+    private axisToVector(axis: Axis): Vector3 {
+        switch ( axis ) {
+        case Axis.X:
+            return new Vector3(1, 0, 0);
+        case Axis.Y:
+            return new Vector3(0, 1, 0);
+        case Axis.Z:
+            return new Vector3(0, 0, 1);
+        }
+    }
+
+    private variantMesh(blockName: string, variantName: string, variant: Variant): Group {
         const model = this.getFlattenedModel(variant.model);
         if ( !model.elements ) {
             throw Error(`Flattened model doesn't have elements tag. Cannot render: ${ blockName }[${ variantName }]`);
@@ -150,11 +158,11 @@ export class ResourceManager {
         delete model.gui_light;
         delete model.ambientocclusion;
 
-        let meshes: Mesh[] = [];
+        let group = new Group();
 
         for ( const elem of model.elements ) {
-            const f = elem.from;
-            const t = elem.to;
+            const f = elem.from as unknown as FixedArray<number, 4>;
+            const t = elem.to as unknown as FixedArray<number, 4>;
             const box = new BoxGeometry(( f[0] - t[0] ) / 16, ( f[1] - t[1] ) / 16, ( f[2] - t[2] ) / 16);
 
             const uvs = [
@@ -169,28 +177,34 @@ export class ResourceManager {
             box.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
 
             const mesh = new Mesh(box, this.genericMaterial);
-            mesh.position.add(new Vector3(f[0] + (f[0] - t[0]) / 2, f[1] - (f[1] - t[1]) / 2, f[2] + (f[2] - t[2]) / 2).divideScalar(16));
+            mesh.position.add(new Vector3(f[0] + ( f[0] - t[0] ) / 2, f[1] - ( f[1] - t[1] ) / 2, f[2] + ( f[2] - t[2] ) / 2).divideScalar(16));
+            group.add(mesh);
 
-            meshes.push(mesh);
+            if ( elem.rotation != null ) {
+                const origin = elem.rotation.origin as unknown as FixedArray<number, 3>;
+                const point = new Vector3(origin[0], origin[1], origin[2]).divideScalar(16);
+                const angle = elem.rotation.angle / 180 * Math.PI;
+                this.rotateAboutPoint(mesh, point, this.axisToVector(elem.rotation.axis), angle);
+            }
         }
 
-        return meshes;
+        return group;
     }
 
-    generateMeshesForBlock(blockName: string): Map<string, Mesh[]> {
+    generateMeshesForBlock(blockName: string): Map<string, Group[]> {
         const definition = this.blockDefinitions.get(blockName);
         if ( !definition?.variants ) {
             throw Error(`${ blockName } is not present in the model map.`);
         }
 
-        const meshes = new Map<string, Mesh[]>();
+        const meshes = new Map<string, Group[]>();
 
         for ( const [ variantName, variations ] of Object.entries(definition.variants) ) {
             meshes.set(
                 variantName,
                 variations instanceof Array
                     ? Object.values(variations).flatMap(v => this.variantMesh(blockName, variantName, v))
-                    : this.variantMesh(blockName, variantName, variations),
+                    : [ this.variantMesh(blockName, variantName, variations) ],
             );
         }
 

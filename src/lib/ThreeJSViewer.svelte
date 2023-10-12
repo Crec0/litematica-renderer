@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Color, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
+    import { Color, Group, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
     import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
     import { ResourceManager } from './render/ResourceManager';
@@ -25,18 +25,25 @@
 
     const manager = new ResourceManager();
     manager.load();
-    const candles = manager.generateMeshesForBlock('turtle_egg');
 
     let co = 0;
-    for ( const candle of candles.values() ) {
-        candle.forEach(cc => {
-            cc.position.add(new Vector3(co, 0, 0));
-            cc.updateMatrix();
-            console.log(cc.position);
-            scene.add(cc);
+
+    manager.generateMeshesForBlock('candle').forEach((groups: Group[]) => {
+        groups.forEach((group: Group) => {
+            group.position.add(new Vector3(co, 0, 0));
+            scene.add(group);
+            co += 2;
         });
-        co++;
-    }
+    });
+
+    co = 0;
+    manager.generateMeshesForBlock('lectern').forEach((groups: Group[]) => {
+        groups.forEach((group: Group) => {
+            group.position.add(new Vector3(co, 0, 2));
+            scene.add(group);
+            co += 2;
+        });
+    });
 
     // const candle = new MeshBasicMaterial({
     //     map: new TextureLoader().load('src/assets/atlas.png', (tex) => {
