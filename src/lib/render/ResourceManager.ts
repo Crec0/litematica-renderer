@@ -15,7 +15,6 @@ import {
     Mesh,
     MeshBasicMaterial,
     NearestFilter,
-    Object3D,
     SRGBColorSpace,
     TextureLoader,
     Vector3,
@@ -120,19 +119,6 @@ export class ResourceManager {
         return this.translateUV(textureName, uvs);
     }
 
-    private rotateAboutPoint(obj: Object3D, point: Vector3, axis: Vector3, theta: number, pointIsWorld: boolean = false) {
-        if ( pointIsWorld ) {
-            obj.parent?.localToWorld(obj.position);
-        }
-        obj.position.sub(point);
-        obj.position.applyAxisAngle(axis, theta);
-        obj.position.add(point);
-        if ( pointIsWorld ) {
-            obj.parent?.worldToLocal(obj.position);
-        }
-        obj.rotateOnAxis(axis, theta);
-    }
-
     private axisToVector(axis: Axis): Vector3 {
         switch ( axis ) {
         case Axis.X:
@@ -161,9 +147,9 @@ export class ResourceManager {
         let group = new Group();
 
         for ( const elem of model.elements ) {
-            const f = elem.from as unknown as FixedArray<number, 4>;
-            const t = elem.to as unknown as FixedArray<number, 4>;
-            const box = new BoxGeometry(( f[0] - t[0] ) / 16, ( f[1] - t[1] ) / 16, ( f[2] - t[2] ) / 16);
+            const f = new Vector3().fromArray(elem.from).divideScalar(16);
+            const t = new Vector3().fromArray(elem.to).divideScalar(16);
+            const box = new BoxGeometry(f.x - t.x, f.y - t.y, f.z - t.z);
 
             const uvs = [
                 ...this.getUVs(model, elem.faces.east),
@@ -177,16 +163,23 @@ export class ResourceManager {
             box.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
 
             const mesh = new Mesh(box, this.genericMaterial);
-            mesh.position.add(new Vector3(f[0] + ( f[0] - t[0] ) / 2, f[1] - ( f[1] - t[1] ) / 2, f[2] + ( f[2] - t[2] ) / 2).divideScalar(16));
-            group.add(mesh);
+            const localOffset = new Vector3(f.x - ( f.x - t.x ) / 2, f.y - ( f.y - t.y ) / 2, f.z - ( f.z - t.z ) / 2);
+            mesh.position.add(localOffset);
 
             if ( elem.rotation != null ) {
-                const origin = elem.rotation.origin as unknown as FixedArray<number, 3>;
-                const point = new Vector3(origin[0], origin[1], origin[2]).divideScalar(16);
+                const pivot = new Vector3().fromArray(elem.rotation.origin).divideScalar(16);
                 const angle = elem.rotation.angle / 180 * Math.PI;
-                this.rotateAboutPoint(mesh, point, this.axisToVector(elem.rotation.axis), angle);
+                const axis = this.axisToVector(elem.rotation.axis);
+                mesh.position.sub(pivot);
+                mesh.position.applyAxisAngle(axis, angle);
+                mesh.position.add(pivot);
+                mesh.rotateOnAxis(axis, angle);
             }
+
+            group.add(mesh);
         }
+
+        group.position.sub(new Vector3(0.5, 0.5, 0.5));
 
         return group;
     }
