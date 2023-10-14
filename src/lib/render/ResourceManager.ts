@@ -11,10 +11,10 @@ import {
     BoxGeometry,
     DoubleSide,
     Float32BufferAttribute,
-    Group,
     Mesh,
     MeshBasicMaterial,
     NearestFilter,
+    Object3D,
     SRGBColorSpace,
     TextureLoader,
     Vector3,
@@ -28,6 +28,13 @@ type FixedArray<
     N extends number,
     R extends readonly T[] = [],
 > = R['length'] extends N ? R : FixedArray<T, N, readonly [ T, ...R ]>;
+
+function cast<T>(object: any): T {
+    return object as unknown as T;
+}
+
+const DEG_TO_RAD = Math.PI / 180;
+const MID_VECTOR = new Vector3(0.5, 0.5, 0.5);
 
 
 export class ResourceManager {
@@ -89,7 +96,7 @@ export class ResourceManager {
     }
 
     private translateUV(textureName: string, uvs: FixedArray<number, 4>): FixedArray<number, 8> {
-        const atlasOffset = ATLAS_DATA[textureName as keyof typeof ATLAS_DATA] as unknown as FixedArray<number, 4>;
+        const atlasOffset = cast<FixedArray<number, 4>>(ATLAS_DATA[textureName as keyof typeof ATLAS_DATA]);
 
         return [
             ( atlasOffset[0] + uvs[0] ) / 2048, ( atlasOffset[1] + uvs[3] ) / 1184,
@@ -115,8 +122,8 @@ export class ResourceManager {
             return this.blankUV;
         }
         const textureName = this.findTextureName(model, face.texture);
-        const uvs = ( face.uv == null ? this.fullFaceUV : face.uv ) as unknown as FixedArray<number, 4>;
-        return this.translateUV(textureName, uvs);
+        const uvs = ( face.uv == null ? this.fullFaceUV : face.uv );
+        return this.translateUV(textureName, cast<FixedArray<number, 4>>(uvs));
     }
 
     private axisToVector(axis: Axis): Vector3 {
@@ -130,7 +137,17 @@ export class ResourceManager {
         }
     }
 
-    private variantMesh(blockName: string, variantName: string, variant: Variant): Group {
+    rotateOnPivot(object: Object3D, axis: Axis, angle: number, pivot: Vector3 = MID_VECTOR) {
+        const radians = angle * DEG_TO_RAD;
+        const axisVector = this.axisToVector(axis);
+        const pos = new Vector3().copy(pivot);
+        object.position.sub(pos);
+        object.position.applyAxisAngle(axisVector, radians);
+        object.position.add(pos);
+        object.rotateOnAxis(axisVector, radians);
+    }
+
+    private variantMesh(blockName: string, variantName: string, variant: Variant): Mesh {
         const model = this.getFlattenedModel(variant.model);
         if ( !model.elements ) {
             throw Error(`Flattened model doesn't have elements tag. Cannot render: ${ blockName }[${ variantName }]`);
@@ -144,7 +161,7 @@ export class ResourceManager {
         delete model.gui_light;
         delete model.ambientocclusion;
 
-        let group = new Group();
+        let unifiedMesh = new Mesh();
 
         for ( const elem of model.elements ) {
             const f = new Vector3().fromArray(elem.from).divideScalar(16);
@@ -163,44 +180,65 @@ export class ResourceManager {
             box.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
 
             const mesh = new Mesh(box, this.genericMaterial);
+
             const localOffset = new Vector3(f.x - ( f.x - t.x ) / 2, f.y - ( f.y - t.y ) / 2, f.z - ( f.z - t.z ) / 2);
             mesh.position.add(localOffset);
 
             if ( elem.rotation != null ) {
                 const pivot = new Vector3().fromArray(elem.rotation.origin).divideScalar(16);
-                const angle = elem.rotation.angle / 180 * Math.PI;
-                const axis = this.axisToVector(elem.rotation.axis);
-                mesh.position.sub(pivot);
-                mesh.position.applyAxisAngle(axis, angle);
-                mesh.position.add(pivot);
-                mesh.rotateOnAxis(axis, angle);
+                this.rotateOnPivot(mesh, elem.rotation.axis, elem.rotation.angle, pivot);
+
+                const rescale = elem.rotation.rescale;
+                if ( rescale != null ) {
+                    // TODO: Add scaling
+                    console.log('Missing scaling', blockName, variantName, elem.rotation.angle);
+                }
             }
 
-            group.add(mesh);
+            unifiedMesh.add(mesh);
         }
 
-        group.position.sub(new Vector3(0.5, 0.5, 0.5));
+        unifiedMesh.children.forEach(c => c.position.subScalar(0.5));
+        unifiedMesh.position.addScalar(0.5);
 
-        return group;
+        if ( variant.y != null ) {
+            console.log(blockName, variantName, 'Y');
+            this.rotateOnPivot(unifiedMesh, Axis.Y, variant.y);
+        }
+        if ( variant.x != null ) {
+            console.log(blockName, variantName, 'X');
+            this.rotateOnPivot(unifiedMesh, Axis.X, variant.x);
+        }
+
+        return unifiedMesh;
     }
 
-    generateMeshesForBlock(blockName: string): Map<string, Group[]> {
+    generateMeshesForBlock(blockName: string): Map<string, Mesh[]> {
         const definition = this.blockDefinitions.get(blockName);
         if ( !definition?.variants ) {
             throw Error(`${ blockName } is not present in the model map.`);
         }
+        const meshes = new Map<string, Mesh[]>();
+        for ( const variantName of Object.keys(definition.variants) ) {
+            meshes.set(variantName, this.generateMeshesForBlockVariant(blockName, variantName));
+        }
+        return meshes;
+    }
 
-        const meshes = new Map<string, Group[]>();
 
-        for ( const [ variantName, variations ] of Object.entries(definition.variants) ) {
-            meshes.set(
-                variantName,
-                variations instanceof Array
-                    ? Object.values(variations).flatMap(v => this.variantMesh(blockName, variantName, v))
-                    : [ this.variantMesh(blockName, variantName, variations) ],
-            );
+    generateMeshesForBlockVariant(blockName: string, variant: string): Mesh[] {
+        const definition = this.blockDefinitions.get(blockName);
+        if ( !definition?.variants ) {
+            throw Error(`${ blockName } is not present in the model map.`);
+        }
+        const variations = definition.variants[variant];
+
+        if ( variations == null ) {
+            throw Error(`${ blockName }[${ variant }] doesn't exit.`);
         }
 
-        return meshes;
+        return variations instanceof Array
+            ? Object.values(variations).flatMap(v => this.variantMesh(blockName, variant, v))
+            : [ this.variantMesh(blockName, variant, variations) ];
     }
 }
