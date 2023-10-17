@@ -8,15 +8,16 @@ import { BlockDefinitionSchema } from './BlockDefinitionSchema';
 import type { Variant } from './BlockDefinition';
 import type { Texture } from 'three';
 import {
+    BackSide,
     BoxGeometry,
-    DoubleSide,
     Float32BufferAttribute,
+    ImageLoader,
     Mesh,
     MeshBasicMaterial,
     NearestFilter,
     Object3D,
     SRGBColorSpace,
-    TextureLoader,
+    Texture,
     Vector3,
 } from 'three';
 import type { BlockModel, Face } from './BlockModel';
@@ -40,24 +41,39 @@ const MID_VECTOR = new Vector3(0.5, 0.5, 0.5);
 
 
 export class ResourceManager {
-    private blockDefinitions: BlockDefinitionMap = new Map();
-    private blockModels: BlockModelMap = new Map();
-    private textureAtlas = new TextureLoader().load('src/assets/atlas.png', (texture: Texture) => {
-        texture.magFilter = NearestFilter;
-        texture.minFilter = NearestFilter;
-        texture.colorSpace = SRGBColorSpace;
-        texture.flipY = false;
-    });
+    private readonly blockDefinitions: BlockDefinitionMap = new Map();
+    private readonly blockModels: BlockModelMap = new Map();
+    private readonly atlasWidth: number;
+    private readonly atlasHeight: number;
+    private readonly atlas: MeshBasicMaterial;
 
-    private genericMaterial = new MeshBasicMaterial({
-        map: this.textureAtlas,
-        side: DoubleSide,
-        alphaTest: 0.5,
-        transparent: true,
-    });
+    private readonly blankUV = [ 0, 0, 0, 0, 0, 0, 0, 0 ];
+    private readonly fullFaceUV = [ 0, 0, 16, 16 ];
 
-    private blankUV = [ 0, 0, 0, 0, 0, 0, 0, 0 ];
-    private fullFaceUV = [ 0, 0, 16, 16 ];
+    constructor() {
+        const atlasImage = new ImageLoader().load('src/assets/atlas.png');
+        this.atlasHeight = atlasImage.height;
+        this.atlasWidth = atlasImage.width;
+
+        this.atlas = this.createAtlas(atlasImage);
+    }
+
+    createAtlas(image: HTMLImageElement): MeshBasicMaterial {
+        const atlasTex = new Texture(image);
+        atlasTex.anisotropy = NearestFilter;
+        atlasTex.colorSpace = SRGBColorSpace;
+        atlasTex.flipY = false;
+        atlasTex.magFilter = NearestFilter;
+        atlasTex.minFilter = NearestFilter;
+        atlasTex.needsUpdate = true;
+
+        return new MeshBasicMaterial({
+            map: atlasTex,
+            side: BackSide,
+            alphaTest: 0.5,
+            transparent: true,
+        });
+    }
 
     load(): void {
         Object.entries(BLOCK_DEFINITIONS).forEach(([ name, value ]: [ string, unknown ]) => {
@@ -101,10 +117,10 @@ export class ResourceManager {
         const atlasOffset = cast<FixedArray<number, 4>>(ATLAS_DATA[textureName as keyof typeof ATLAS_DATA]);
 
         return [
-            ( atlasOffset[0] + uvs[0] ) / 2048, ( atlasOffset[1] + uvs[3] ) / 1184,
-            ( atlasOffset[0] + uvs[2] ) / 2048, ( atlasOffset[1] + uvs[3] ) / 1184,
-            ( atlasOffset[0] + uvs[0] ) / 2048, ( atlasOffset[1] + uvs[1] ) / 1184,
-            ( atlasOffset[0] + uvs[2] ) / 2048, ( atlasOffset[1] + uvs[1] ) / 1184,
+            ( atlasOffset[0] + uvs[0] ) / this.atlasWidth, ( atlasOffset[1] + uvs[3] ) / this.atlasHeight,
+            ( atlasOffset[0] + uvs[2] ) / this.atlasWidth, ( atlasOffset[1] + uvs[3] ) / this.atlasHeight,
+            ( atlasOffset[0] + uvs[0] ) / this.atlasWidth, ( atlasOffset[1] + uvs[1] ) / this.atlasHeight,
+            ( atlasOffset[0] + uvs[2] ) / this.atlasWidth, ( atlasOffset[1] + uvs[1] ) / this.atlasHeight,
         ];
     }
 
@@ -193,7 +209,7 @@ export class ResourceManager {
 
             box.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
 
-            const mesh = new Mesh(box, this.genericMaterial);
+            const mesh = new Mesh(box, this.atlas);
 
             const localOffset = new Vector3(f.x - ( f.x - t.x ) / 2, f.y - ( f.y - t.y ) / 2, f.z - ( f.z - t.z ) / 2);
             mesh.position.add(localOffset);
@@ -216,11 +232,9 @@ export class ResourceManager {
         unifiedMesh.position.addScalar(0.5);
 
         if ( variant.y != null ) {
-            console.log(blockName, variantName, 'Y');
             this.rotateOnPivot(unifiedMesh, Axis.Y, variant.y);
         }
         if ( variant.x != null ) {
-            console.log(blockName, variantName, 'X');
             this.rotateOnPivot(unifiedMesh, Axis.X, variant.x);
         }
 
