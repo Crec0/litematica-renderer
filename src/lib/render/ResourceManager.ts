@@ -34,6 +34,8 @@ function cast<T>(object: any): T {
 }
 
 const DEG_TO_RAD = Math.PI / 180;
+const SCALE_22_5 = 1 / Math.cos(( Math.PI / 8 ));
+const SCALE_45 = 1 / Math.cos(( Math.PI / 4 ));
 const MID_VECTOR = new Vector3(0.5, 0.5, 0.5);
 
 
@@ -126,7 +128,7 @@ export class ResourceManager {
         return this.translateUV(textureName, cast<FixedArray<number, 4>>(uvs));
     }
 
-    private axisToVector(axis: Axis): Vector3 {
+    private axisToAxisVector(axis: Axis): Vector3 {
         switch ( axis ) {
         case Axis.X:
             return new Vector3(1, 0, 0);
@@ -137,9 +139,21 @@ export class ResourceManager {
         }
     }
 
+    private axisToScaleVector(axis: Axis, angle: number): Vector3 {
+        const scaleFactor = angle === 22.5 ? SCALE_22_5 : SCALE_45;
+        switch ( axis ) {
+        case Axis.X:
+            return new Vector3(1, scaleFactor, scaleFactor);
+        case Axis.Y:
+            return new Vector3(scaleFactor, 1, scaleFactor);
+        case Axis.Z:
+            return new Vector3(scaleFactor, scaleFactor, 1);
+        }
+    }
+
     rotateOnPivot(object: Object3D, axis: Axis, angle: number, pivot: Vector3 = MID_VECTOR) {
         const radians = angle * DEG_TO_RAD;
-        const axisVector = this.axisToVector(axis);
+        const axisVector = this.axisToAxisVector(axis);
         const pos = new Vector3().copy(pivot);
         object.position.sub(pos);
         object.position.applyAxisAngle(axisVector, radians);
@@ -184,14 +198,14 @@ export class ResourceManager {
             const localOffset = new Vector3(f.x - ( f.x - t.x ) / 2, f.y - ( f.y - t.y ) / 2, f.z - ( f.z - t.z ) / 2);
             mesh.position.add(localOffset);
 
-            if ( elem.rotation != null ) {
-                const pivot = new Vector3().fromArray(elem.rotation.origin).divideScalar(16);
-                this.rotateOnPivot(mesh, elem.rotation.axis, elem.rotation.angle, pivot);
+            const rot = elem.rotation;
+            if ( rot != null ) {
+                const pivot = new Vector3().fromArray(rot.origin).divideScalar(16);
+                this.rotateOnPivot(mesh, rot.axis, rot.angle, pivot);
 
-                const rescale = elem.rotation.rescale;
-                if ( rescale != null ) {
-                    // TODO: Add scaling
-                    console.log('Missing scaling', blockName, variantName, elem.rotation.angle);
+                if ( rot.rescale ) {
+                    const scaleVector = this.axisToScaleVector(rot.axis, Math.abs(rot.angle));
+                    mesh.scale.multiply(scaleVector);
                 }
             }
 
