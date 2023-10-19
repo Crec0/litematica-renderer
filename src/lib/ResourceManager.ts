@@ -62,7 +62,6 @@ export class ResourceManager {
         const atlasTex = new Texture(image);
         atlasTex.anisotropy = NearestFilter;
         atlasTex.colorSpace = SRGBColorSpace;
-        // atlasTex.flipY = false;
         atlasTex.magFilter = NearestFilter;
         atlasTex.minFilter = NearestFilter;
         atlasTex.needsUpdate = true;
@@ -236,7 +235,6 @@ export class ResourceManager {
             this.rotateOnPivot(unifiedMesh, Axis.Y, variant.y);
         }
         if ( variant.x != null ) {
-            console.log('we');
             this.rotateOnPivot(unifiedMesh, Axis.X, variant.x);
         }
 
