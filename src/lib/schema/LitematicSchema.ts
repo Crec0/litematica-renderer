@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
 
-export interface BlockStatePalette {
+export interface BlockState {
     Name: string;
     Properties?: { [key: string]: string };
 }
 
 
-export const blockStatePaletteSchema = z.object({
+export const blockStateSchema = z.object({
     Name: z.string(),
     Properties: z.record(z.string()).optional(),
 });
@@ -31,7 +31,7 @@ export interface Region {
     BlockStates: bigint[];
     PendingBlockTicks: any[];
     Position: Vector3;
-    BlockStatePalette: BlockStatePalette[];
+    BlockStatePalette: BlockState[];
     Size: Vector3;
     PendingFluidTicks: any[];
     TileEntities: any[];
@@ -43,7 +43,7 @@ export const regionSchema = z.object({
     BlockStates: z.array(z.bigint()),
     PendingBlockTicks: z.array(z.any()),
     Position: vector3Schema,
-    BlockStatePalette: z.array(blockStatePaletteSchema),
+    BlockStatePalette: z.array(blockStateSchema),
     Size: vector3Schema,
     PendingFluidTicks: z.array(z.any()),
     TileEntities: z.array(z.any()),
