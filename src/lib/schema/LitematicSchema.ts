@@ -28,7 +28,7 @@ export const vector3Schema = z.object({
 
 
 export interface Region {
-    BlockStates: string[];
+    BlockStates: bigint[];
     PendingBlockTicks: any[];
     Position: Vector3;
     BlockStatePalette: BlockStatePalette[];
@@ -40,7 +40,7 @@ export interface Region {
 
 
 export const regionSchema = z.object({
-    BlockStates: z.array(z.string()),
+    BlockStates: z.array(z.bigint()),
     PendingBlockTicks: z.array(z.any()),
     Position: vector3Schema,
     BlockStatePalette: z.array(blockStatePaletteSchema),
