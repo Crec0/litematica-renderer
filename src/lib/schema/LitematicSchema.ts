@@ -52,8 +52,8 @@ export const regionSchema = z.object({
 
 
 export interface Metadata {
-    TimeCreated: string;
-    TimeModified: string;
+    TimeCreated: bigint;
+    TimeModified: bigint;
     EnclosingSize: Vector3;
     Description: string;
     RegionCount: number;
@@ -65,8 +65,8 @@ export interface Metadata {
 
 
 export const metadataSchema = z.object({
-    TimeCreated: z.string(),
-    TimeModified: z.string(),
+    TimeCreated: z.bigint(),
+    TimeModified: z.bigint(),
     EnclosingSize: vector3Schema,
     Description: z.string(),
     RegionCount: z.number(),
