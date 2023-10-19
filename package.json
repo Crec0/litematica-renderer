@@ -23,6 +23,7 @@
     "vite": "^4.4.9"
   },
   "dependencies": {
+    "deepmerge": "^4.3.1",
     "deepslate": "^0.18.0",
     "gl-matrix": "^3.4.3",
     "pako": "^2.1.0",
