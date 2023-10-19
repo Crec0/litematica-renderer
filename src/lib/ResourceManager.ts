@@ -1,12 +1,6 @@
-import BLOCK_DEFINITIONS from '../../assets/block-definitions.json';
-import BLOCK_MODELS from '../../assets/block-models.json';
-import ATLAS_DATA from '../../assets/atlas.json';
-import type { BlockModelMap } from './BlockModelSchema';
-import { BlockModelSchema } from './BlockModelSchema';
-import type { BlockDefinitionMap } from './BlockDefinitionSchema';
-import { BlockDefinitionSchema } from './BlockDefinitionSchema';
-import type { Variant } from './BlockDefinition';
-import type { Texture } from 'three';
+import BLOCK_DEFINITIONS from '../assets/block-definitions.json';
+import BLOCK_MODELS from '../assets/block-models.json';
+import ATLAS_DATA from '../assets/atlas.json';
 import {
     BackSide,
     BoxGeometry,
@@ -20,15 +14,21 @@ import {
     Texture,
     Vector3,
 } from 'three';
-import type { BlockModel, Face } from './BlockModel';
-import { Axis } from './BlockModel';
+import { randInt } from 'three/src/math/MathUtils';
+import deepmerge from 'deepmerge';
+import {
+    blockDefinionSchema,
+    type BlockDefinition,
+    type BlockVariant,
+    type MultiPartCondition,
+} from './schema/BlockDefinitionSchema';
+import { Axis, type BlockModel, blockModelSchema, type Face } from './schema/BlockModelSchema';
 
 
-type FixedArray<
-    T,
+type FixedNumberArray<
     N extends number,
-    R extends readonly T[] = [],
-> = R['length'] extends N ? R : FixedArray<T, N, readonly [ T, ...R ]>;
+    R extends readonly number[] = [],
+> = R['length'] extends N ? R : FixedNumberArray<N, readonly [ number, ...R ]>;
 
 function cast<T>(object: any): T {
     return object as unknown as T;
@@ -41,14 +41,14 @@ const MID_VECTOR = new Vector3(0.5, 0.5, 0.5);
 
 
 export class ResourceManager {
-    private readonly blockDefinitions: BlockDefinitionMap = new Map();
-    private readonly blockModels: BlockModelMap = new Map();
+    private readonly blockDefinitions: Map<string, BlockDefinition> = new Map();
+    private readonly blockModels: Map<string, BlockModel> = new Map();
     private readonly atlasWidth: number;
     private readonly atlasHeight: number;
     private readonly atlas: MeshBasicMaterial;
 
-    private readonly blankUV = [ 0, 0, 0, 0, 0, 0, 0, 0 ];
-    private readonly fullFaceUV = [ 0, 0, 16, 16 ];
+    private readonly blankUV: FixedNumberArray<8> = [ 0, 0, 0, 0, 0, 0, 0, 0 ];
+    private readonly fullFaceUV: FixedNumberArray<4> = [ 0, 0, 16, 16 ];
 
     constructor() {
         const atlasImage = new ImageLoader().load('src/assets/atlas.png');
@@ -62,7 +62,7 @@ export class ResourceManager {
         const atlasTex = new Texture(image);
         atlasTex.anisotropy = NearestFilter;
         atlasTex.colorSpace = SRGBColorSpace;
-        atlasTex.flipY = false;
+        // atlasTex.flipY = false;
         atlasTex.magFilter = NearestFilter;
         atlasTex.minFilter = NearestFilter;
         atlasTex.needsUpdate = true;
@@ -70,25 +70,25 @@ export class ResourceManager {
         return new MeshBasicMaterial({
             map: atlasTex,
             side: BackSide,
-            alphaTest: 0.5,
+            alphaTest: 0.1,
             transparent: true,
         });
     }
 
     load(): void {
         Object.entries(BLOCK_DEFINITIONS).forEach(([ name, value ]: [ string, unknown ]) => {
-            const parseResult = BlockDefinitionSchema.safeParse(value);
+            const parseResult = blockDefinionSchema.safeParse(value);
             if ( parseResult.success ) {
-                this.blockDefinitions.set(name, parseResult.data);
+                this.blockDefinitions.set(name, cast(parseResult.data));
             } else {
                 console.log('Failed to load definition:', name);
             }
         });
 
         Object.entries(BLOCK_MODELS).forEach(([ name, value ]: [ string, unknown ]) => {
-            const parseResult = BlockModelSchema.safeParse(value);
+            const parseResult = blockModelSchema.safeParse(value);
             if ( parseResult.success ) {
-                this.blockModels.set(name, parseResult.data);
+                this.blockModels.set(name, cast(parseResult.data));
             } else {
                 console.log('Failed to load definition:', name);
             }
@@ -108,19 +108,18 @@ export class ResourceManager {
         if ( model.parent ) {
             const parent = this.getFlattenedModel(model.parent);
             delete model.parent;
-            return Object.assign(parent, model);
+            return deepmerge(parent, model);
         }
         return model;
     }
 
-    private translateUV(textureName: string, uvs: FixedArray<number, 4>): FixedArray<number, 8> {
-        const atlasOffset = cast<FixedArray<number, 4>>(ATLAS_DATA[textureName as keyof typeof ATLAS_DATA]);
-
+    private translateUV(textureName: string, uvs: FixedNumberArray<4>): FixedNumberArray<8> {
+        const atlasOffset: FixedNumberArray<4> = cast(ATLAS_DATA[textureName as keyof typeof ATLAS_DATA]);
         return [
-            ( atlasOffset[0] + uvs[0] ) / this.atlasWidth, ( atlasOffset[1] + uvs[3] ) / this.atlasHeight,
-            ( atlasOffset[0] + uvs[2] ) / this.atlasWidth, ( atlasOffset[1] + uvs[3] ) / this.atlasHeight,
-            ( atlasOffset[0] + uvs[0] ) / this.atlasWidth, ( atlasOffset[1] + uvs[1] ) / this.atlasHeight,
-            ( atlasOffset[0] + uvs[2] ) / this.atlasWidth, ( atlasOffset[1] + uvs[1] ) / this.atlasHeight,
+            ( atlasOffset[0] + uvs[0] ) / this.atlasWidth, ( this.atlasHeight - 16 - atlasOffset[1] + uvs[3] ) / this.atlasHeight,
+            ( atlasOffset[0] + uvs[2] ) / this.atlasWidth, ( this.atlasHeight - 16 - atlasOffset[1] + uvs[3] ) / this.atlasHeight,
+            ( atlasOffset[0] + uvs[0] ) / this.atlasWidth, ( this.atlasHeight - 16 - atlasOffset[1] + uvs[1] ) / this.atlasHeight,
+            ( atlasOffset[0] + uvs[2] ) / this.atlasWidth, ( this.atlasHeight - 16 - atlasOffset[1] + uvs[1] ) / this.atlasHeight,
         ];
     }
 
@@ -135,13 +134,13 @@ export class ResourceManager {
         return texture.replace('minecraft:', '');
     }
 
-    private getUVs(model: BlockModel, face: Face | undefined) {
+    private getUVs(model: BlockModel, face: Face | undefined, defaultUVs: FixedNumberArray<4>) {
         if ( face == null ) {
             return this.blankUV;
         }
         const textureName = this.findTextureName(model, face.texture);
-        const uvs = ( face.uv == null ? this.fullFaceUV : face.uv );
-        return this.translateUV(textureName, cast<FixedArray<number, 4>>(uvs));
+        const uvs: FixedNumberArray<4> = cast(face.uv == null ? defaultUVs : face.uv);
+        return this.translateUV(textureName, uvs);
     }
 
     private axisToAxisVector(axis: Axis): Vector3 {
@@ -156,7 +155,7 @@ export class ResourceManager {
     }
 
     private axisToScaleVector(axis: Axis, angle: number): Vector3 {
-        const scaleFactor = angle === 22.5 ? SCALE_22_5 : SCALE_45;
+        const scaleFactor = Math.abs(angle) === 22.5 ? SCALE_22_5 : SCALE_45;
         switch ( axis ) {
         case Axis.X:
             return new Vector3(1, scaleFactor, scaleFactor);
@@ -177,7 +176,7 @@ export class ResourceManager {
         object.rotateOnAxis(axisVector, radians);
     }
 
-    private variantMesh(blockName: string, variantName: string, variant: Variant): Mesh {
+    private variantMesh(blockName: string, variantName: string, variant: BlockVariant): Mesh {
         const model = this.getFlattenedModel(variant.model);
         if ( !model.elements ) {
             throw Error(`Flattened model doesn't have elements tag. Cannot render: ${ blockName }[${ variantName }]`);
@@ -197,22 +196,24 @@ export class ResourceManager {
             const f = new Vector3().fromArray(elem.from).divideScalar(16);
             const t = new Vector3().fromArray(elem.to).divideScalar(16);
             const box = new BoxGeometry(f.x - t.x, f.y - t.y, f.z - t.z);
+            const meshOffset = new Vector3(f.x - ( f.x - t.x ) / 2, f.y - ( f.y - t.y ) / 2, f.z - ( f.z - t.z ) / 2);
+
+            f.multiplyScalar(16);
+            t.multiplyScalar(16);
 
             const uvs = [
-                ...this.getUVs(model, elem.faces.east),
-                ...this.getUVs(model, elem.faces.west),
-                ...this.getUVs(model, elem.faces.down),
-                ...this.getUVs(model, elem.faces.up),
-                ...this.getUVs(model, elem.faces.north),
-                ...this.getUVs(model, elem.faces.south),
+                ...this.getUVs(model, elem.faces.east, [ t.x, t.y, f.x, f.y ]),
+                ...this.getUVs(model, elem.faces.west, [ t.z, t.y, f.z, f.y ]),
+                ...this.getUVs(model, elem.faces.down, [ f.x, f.z, t.x, t.z ]),
+                ...this.getUVs(model, elem.faces.up, [ f.x, f.z, t.x, t.z ]),
+                ...this.getUVs(model, elem.faces.north, [ t.x, t.y, f.x, f.y ]),
+                ...this.getUVs(model, elem.faces.south, [ t.z, t.y, f.z, f.y ]),
             ];
 
             box.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
 
             const mesh = new Mesh(box, this.atlas);
-
-            const localOffset = new Vector3(f.x - ( f.x - t.x ) / 2, f.y - ( f.y - t.y ) / 2, f.z - ( f.z - t.z ) / 2);
-            mesh.position.add(localOffset);
+            mesh.position.add(meshOffset);
 
             const rot = elem.rotation;
             if ( rot != null ) {
@@ -220,7 +221,7 @@ export class ResourceManager {
                 this.rotateOnPivot(mesh, rot.axis, rot.angle, pivot);
 
                 if ( rot.rescale ) {
-                    const scaleVector = this.axisToScaleVector(rot.axis, Math.abs(rot.angle));
+                    const scaleVector = this.axisToScaleVector(rot.axis, rot.angle);
                     mesh.scale.multiply(scaleVector);
                 }
             }
@@ -235,20 +236,38 @@ export class ResourceManager {
             this.rotateOnPivot(unifiedMesh, Axis.Y, variant.y);
         }
         if ( variant.x != null ) {
+            console.log('we');
             this.rotateOnPivot(unifiedMesh, Axis.X, variant.x);
         }
 
         return unifiedMesh;
     }
 
-    generateMeshesForBlock(blockName: string): Map<string, Mesh[]> {
+
+    private parseCondition(variant: BlockVariant, condition: MultiPartCondition) {
+
+    }
+
+    generateMeshesForBlock(blockName: string): Mesh[] {
         const definition = this.blockDefinitions.get(blockName);
-        if ( !definition?.variants ) {
-            throw Error(`${ blockName } is not present in the model map.`);
+        const meshes: Mesh[] = [];
+        if ( definition?.variants != null ) {
+            for ( const variantName of Object.keys(definition.variants) ) {
+                meshes.push(...this.generateMeshesForBlockVariant(blockName, variantName));
+            }
         }
-        const meshes = new Map<string, Mesh[]>();
-        for ( const variantName of Object.keys(definition.variants) ) {
-            meshes.set(variantName, this.generateMeshesForBlockVariant(blockName, variantName));
+        if ( definition?.multipart != null ) {
+
+            for ( const multipart of definition.multipart ) {
+                const apply = multipart.apply;
+                const variant = apply instanceof Array ? apply[randInt(0, apply.length)] : apply;
+                if ( variant == null ) {
+                    break;
+                }
+                console.log(variant);
+                // const condition = this.parseCondition(variant, multipart.when)
+                meshes.push(this.variantMesh(blockName, '', variant));
+            }
         }
         return meshes;
     }
