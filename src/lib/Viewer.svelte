@@ -1,39 +1,13 @@
 <script lang="ts">
-    import {
-        AxesHelper,
-        BoxGeometry,
-        Color,
-        LineBasicMaterial,
-        LineSegments,
-        Mesh,
-        PerspectiveCamera,
-        Scene,
-        Vector3,
-        WebGLRenderer,
-        WireframeGeometry,
-    } from 'three';
+    import { Color, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
 
     import { ResourceManager } from './ResourceManager';
     import Stats from 'three/examples/jsm/libs/stats.module';
     import { MapControls } from 'three/examples/jsm/controls/MapControls';
+    import { LitematicRenderer } from './render/LitematicRenderer';
 
 
     let isLitematicLoaded = false;
-
-    const handleFileUpload = (event: Event) => {
-        const files = ( event.target as HTMLInputElement ).files;
-        if ( files === null || files.length == 0 ) {
-            return;
-        }
-        readFile(files.item(0));
-    };
-
-    const readFile = (file: Blob) => {
-        const reader = new FileReader();
-        reader.readAsArrayBuffer(file);
-        reader.onload = () =>
-            renderAsStructure(new Uint8Array(reader.result as ArrayBuffer));
-    };
 
     const stats = new Stats();
     document.body.appendChild(stats.dom);
@@ -53,28 +27,23 @@
     const manager = new ResourceManager();
     manager.load();
 
-    const wireframes = false;
+    const litematicaRenderer = new LitematicRenderer(manager);
 
-    const meshes = [
-        ...manager.generateMeshesForBlock('mossy_cobblestone_wall').values(),
-        // ...manager.generateMeshesForBlock('pink_stained_glass').values(),
-        // ...manager.generateMeshesForBlock('blue_ice').values(),
-    ];
-
-    let dx = 0;
-    let dz = 0;
-    meshes.forEach((mesh: Mesh) => {
-        mesh.position.add(new Vector3(0, dx, dz));
-        if ( wireframes ) {
-            const wireframe = new LineSegments(new WireframeGeometry(new BoxGeometry()), new LineBasicMaterial({ color: 0xFF00FF }));
-            wireframe.position.add(new Vector3(dx + 0.5, 0.5, dz + 0.5));
-            scene.add(wireframe);
+    const handleFileUpload = (event: Event) => {
+        const files = ( event.target as HTMLInputElement ).files;
+        if ( files != null && files.length > 0 ) {
+            readFile(files.item(0)!);
         }
-        scene.add(mesh);
-        dz += 2;
-    });
+    };
 
-    scene.add(new AxesHelper(100));
+    const readFile = (file: Blob) => {
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(file);
+        reader.onload = () => {
+            const mesh = litematicaRenderer.render(new Uint8Array(reader.result as ArrayBuffer));
+            scene.add(mesh);
+        };
+    };
 
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;

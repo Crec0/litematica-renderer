@@ -16,13 +16,9 @@ import {
 } from 'three';
 import { randInt } from 'three/src/math/MathUtils';
 import deepmerge from 'deepmerge';
-import {
-    blockDefinionSchema,
-    type BlockDefinition,
-    type BlockVariant,
-    type MultiPartCondition,
-} from './schema/BlockDefinitionSchema';
+import { blockDefinionSchema, type BlockDefinition, type BlockVariant } from './schema/BlockDefinitionSchema';
 import { Axis, type BlockModel, blockModelSchema, type Face } from './schema/BlockModelSchema';
+import type { BlockState } from './schema/LitematicSchema';
 
 
 type FixedNumberArray<
@@ -43,12 +39,12 @@ const MID_VECTOR = new Vector3(0.5, 0.5, 0.5);
 export class ResourceManager {
     private readonly blockDefinitions: Map<string, BlockDefinition> = new Map();
     private readonly blockModels: Map<string, BlockModel> = new Map();
+
+    private readonly blankUV: FixedNumberArray<8> = [ 0, 0, 0, 0, 0, 0, 0, 0 ];
+
     private readonly atlasWidth: number;
     private readonly atlasHeight: number;
     private readonly atlas: MeshBasicMaterial;
-
-    private readonly blankUV: FixedNumberArray<8> = [ 0, 0, 0, 0, 0, 0, 0, 0 ];
-    private readonly fullFaceUV: FixedNumberArray<4> = [ 0, 0, 16, 16 ];
 
     constructor() {
         const atlasImage = new ImageLoader().load('src/assets/atlas.png');
@@ -80,7 +76,7 @@ export class ResourceManager {
             if ( parseResult.success ) {
                 this.blockDefinitions.set(name, cast(parseResult.data));
             } else {
-                console.log('Failed to load definition:', name);
+                console.error('Failed to load definition:', name);
             }
         });
 
@@ -89,7 +85,7 @@ export class ResourceManager {
             if ( parseResult.success ) {
                 this.blockModels.set(name, cast(parseResult.data));
             } else {
-                console.log('Failed to load definition:', name);
+                console.error('Failed to load definition:', name);
             }
         });
     }
@@ -175,13 +171,23 @@ export class ResourceManager {
         object.rotateOnAxis(axisVector, radians);
     }
 
-    private variantMesh(blockName: string, variantName: string, variant: BlockVariant): Mesh {
+    private stringifyBlockstate(blockState: BlockState): string {
+        const props = blockState.Properties;
+        const stringifyProps = props == null ? '' : Object.entries(props).map(([ k, v ]) => `${ k }=${ v }`).join(',');
+        return `${ blockState.Name }[${ stringifyProps }]`;
+    }
+
+    private variantMesh(block: BlockState, variant: BlockVariant): Mesh {
+        if ( block.Name === 'air' || block.Name === 'void_air' || block.Name === 'cave_air' ) {
+            return new Mesh();
+        }
+
         const model = this.getFlattenedModel(variant.model);
         if ( !model.elements ) {
-            throw Error(`Flattened model doesn't have elements tag. Cannot render: ${ blockName }[${ variantName }]`);
+            throw Error(`Flattened model doesn't have elements tag. Cannot render: ${ this.stringifyBlockstate(block) }]`);
         }
         if ( !model.textures ) {
-            throw Error(`Flattened model doesn't have textures. Cannot render: ${ blockName }[${ variantName }]`);
+            throw Error(`Flattened model doesn't have textures. Cannot render: ${ this.stringifyBlockstate(block) }]`);
         }
         // Delete unnecessary stuff
         delete model.textures['particle'];
@@ -241,49 +247,80 @@ export class ResourceManager {
         return unifiedMesh;
     }
 
-
-    private parseCondition(variant: BlockVariant, condition: MultiPartCondition) {
-
+    private pickOneVariant(variants: BlockVariant | BlockVariant[]): BlockVariant {
+        return variants instanceof Array ? variants[randInt(0, variants.length)]! : variants;
     }
 
-    generateMeshesForBlock(blockName: string): Mesh[] {
-        const definition = this.blockDefinitions.get(blockName);
-        const meshes: Mesh[] = [];
-        if ( definition?.variants != null ) {
-            for ( const variantName of Object.keys(definition.variants) ) {
-                meshes.push(...this.generateMeshesForBlockVariant(blockName, variantName));
+    private calculateMatchingPropsScore(variant: string, props: Record<string, string>) {
+        return variant.split(',')
+            .reduce((acc, prop) => {
+                const [ k, v ] = prop.split('=');
+                acc += k! in props && props[k!] == v ? 1 : 0;
+                return acc;
+            }, 0);
+    }
+
+    findApplicableVariants(state: BlockState, definition: BlockDefinition): BlockVariant[] {
+        const variantsToApply: BlockVariant[] = [];
+
+        if ( definition.variants != null ) {
+            const variantsNames = Object.keys(definition.variants);
+
+            if ( variantsNames.length == 0 ) {
+                throw Error('Impossible case where it has 0 variants');
             }
-        }
-        if ( definition?.multipart != null ) {
+
+            let bestMatch = variantsNames[0]!;
+            let bestMatchScore = -Infinity;
+
+            if ( state.Properties != null ) {
+                for ( const variant of variantsNames ) {
+                    const variantMatchScore = this.calculateMatchingPropsScore(variant, state.Properties);
+                    if ( bestMatchScore <= variantMatchScore ) {
+                        bestMatchScore = variantMatchScore;
+                        bestMatch = variant;
+                    }
+                }
+            }
+
+            const variant = this.pickOneVariant(definition.variants[bestMatch]!);
+            variantsToApply.push(variant);
+
+        } else if ( definition.multipart != null ) {
 
             for ( const multipart of definition.multipart ) {
-                const apply = multipart.apply;
-                const variant = apply instanceof Array ? apply[randInt(0, apply.length)] : apply;
-                if ( variant == null ) {
-                    break;
+                if ( multipart.when == undefined || state.Properties == undefined ) {
+                    variantsToApply.push(this.pickOneVariant(multipart.apply));
+                    continue;
                 }
-                console.log(variant);
-                // const condition = this.parseCondition(variant, multipart.when)
-                meshes.push(this.variantMesh(blockName, '', variant));
+
+                let allMatch = true;
+                for ( const [ prop, val ] of Object.entries(multipart.when) ) {
+                    allMatch &&= prop in state.Properties! && state.Properties![prop] == val;
+                }
+                if ( allMatch ) {
+                    variantsToApply.push(this.pickOneVariant(multipart.apply));
+                }
             }
+
+        } else {
+            throw Error(`Block definition is missing both variants and multipart. Culprit: ${ state.Name }`);
         }
-        return meshes;
+
+        return variantsToApply;
     }
 
-
-    generateMeshesForBlockVariant(blockName: string, variant: string): Mesh[] {
-        const definition = this.blockDefinitions.get(blockName);
-        if ( !definition?.variants ) {
-            throw Error(`${ blockName } is not present in the model map.`);
-        }
-        const variations = definition.variants[variant];
-
-        if ( variations == null ) {
-            throw Error(`${ blockName }[${ variant }] doesn't exit.`);
+    generateMeshForBlockState(blockState: BlockState): Mesh {
+        const definition = this.blockDefinitions.get(blockState.Name);
+        if ( definition == null ) {
+            throw Error(`${ blockState.Name } is not present in the model map.`);
         }
 
-        return variations instanceof Array
-            ? Object.values(variations).flatMap(v => this.variantMesh(blockName, variant, v))
-            : [ this.variantMesh(blockName, variant, variations) ];
+        return this
+            .findApplicableVariants(blockState, definition)
+            .reduce((mesh, variant) => {
+                mesh.add(this.variantMesh(blockState, variant));
+                return mesh;
+            }, new Mesh());
     }
 }

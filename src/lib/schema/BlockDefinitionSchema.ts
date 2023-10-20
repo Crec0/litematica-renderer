@@ -125,7 +125,7 @@ export const multipartSchema = z.object({
 
 
 export interface BlockDefinition {
-    variants?: { [key: string]: BlockVariant[] | BlockVariant };
+    variants?: Record<string, BlockVariant[] | BlockVariant>;
     multipart?: Multipart[];
 }
 

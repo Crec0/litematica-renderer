@@ -10,7 +10,7 @@ export enum GUILight {
 
 
 export interface Override {
-    predicate: { [key: string]: number };
+    predicate: Record<string, number>;
     model: string;
 }
 
@@ -178,7 +178,7 @@ export const elementSchema = z.object({
 
 export interface BlockModel {
     parent?: string;
-    textures?: { [key: string]: string };
+    textures?: Record<string, string>;
     elements?: Element[];
     ambientocclusion?: boolean;
     gui_light?: GUILight;

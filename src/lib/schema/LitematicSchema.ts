@@ -81,7 +81,7 @@ export interface Litematic {
     MinecraftDataVersion: number;
     Version: number;
     Metadata: Metadata;
-    Regions: { [key: string]: Region };
+    Regions: Record<string, Region>;
 }
 
 
