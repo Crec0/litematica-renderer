@@ -103,6 +103,9 @@ export class ResourceManager {
         if ( model.parent ) {
             const parent = this.getFlattenedModel(model.parent);
             delete model.parent;
+            if (parent.elements && model.elements) {
+                delete parent.elements;
+            }
             return deepmerge(parent, model);
         }
         return model;
