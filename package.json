@@ -10,22 +10,22 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^2.4.6",
+    "@sveltejs/vite-plugin-svelte": "^2.5.3",
     "@tsconfig/svelte": "^3.0.0",
     "@types/three": "^0.156.0",
-    "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.30",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
     "svelte": "^3.59.2",
     "svelte-check": "^2.10.3",
-    "tailwindcss": "^3.3.3",
-    "tslib": "^2.6.2",
+    "tailwindcss": "^3.4.4",
+    "tslib": "^2.6.3",
     "typescript": "^4.9.5",
-    "vite": "^4.4.9"
+    "vite": "^4.5.3"
   },
   "dependencies": {
     "deepmerge": "^4.3.1",
     "pako": "^2.1.0",
     "three": "^0.157.0",
-    "zod": "^3.22.2"
+    "zod": "^3.23.8"
   }
 }
