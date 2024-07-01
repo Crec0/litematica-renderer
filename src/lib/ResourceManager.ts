@@ -3,13 +3,14 @@ import BLOCK_MODELS from '../assets/block-models.json';
 import ATLAS_DATA from '../assets/atlas.json';
 import {
     BackSide,
-    BoxGeometry,
     Float32BufferAttribute,
+    Group,
     ImageLoader,
     Mesh,
     MeshBasicMaterial,
     NearestFilter,
     Object3D,
+    PlaneGeometry,
     SRGBColorSpace,
     Texture,
     Vector3,
@@ -34,6 +35,53 @@ const DEG_TO_RAD = Math.PI / 180;
 const SCALE_22_5 = 1 / Math.cos(( Math.PI / 8 ));
 const SCALE_45 = 1 / Math.cos(( Math.PI / 4 ));
 const MID_VECTOR = new Vector3(0.5, 0.5, 0.5);
+
+const AXIS_ROT_OFFSET_LUT = {
+    'north': {
+        xRot: 0,
+        yRot: 0,
+        xOffset: 0,
+        yOffset: 0,
+        zOffset: -0.5,
+    },
+    'south': {
+        xRot: 0,
+        yRot: 180,
+        xOffset: 0,
+        yOffset: 0,
+        zOffset: 0.5,
+    },
+    'east': {
+        xRot: 0,
+        yRot: -90,
+        xOffset: 0.5,
+        yOffset: 0,
+        zOffset: 0,
+    },
+    'west': {
+        xRot: 0,
+        yRot: 90,
+        xOffset: -0.5,
+        yOffset: 0,
+        zOffset: 0,
+    },
+    'up': {
+        xRot: 90,
+        yRot: 180,
+        xOffset: 0,
+        yOffset: 0.5,
+        zOffset: 0,
+    },
+    'down': {
+        xRot: -90,
+        yRot: 180,
+        xOffset: 0,
+        yOffset: -0.5,
+        zOffset: 0,
+    },
+} as const;
+
+type Side = keyof typeof AXIS_ROT_OFFSET_LUT;
 
 
 export class ResourceManager {
@@ -103,7 +151,7 @@ export class ResourceManager {
         if ( model.parent ) {
             const parent = this.getFlattenedModel(model.parent);
             delete model.parent;
-            if (parent.elements && model.elements) {
+            if ( parent.elements && model.elements ) {
                 delete parent.elements;
             }
             return deepmerge(parent, model);
@@ -174,23 +222,23 @@ export class ResourceManager {
         object.rotateOnAxis(axisVector, radians);
     }
 
-    private stringifyBlockstate(blockState: BlockState): string {
+    private stringifyBlockState(blockState: BlockState): string {
         const props = blockState.Properties;
         const stringifyProps = props == null ? '' : Object.entries(props).map(([ k, v ]) => `${ k }=${ v }`).join(',');
         return `${ blockState.Name }[${ stringifyProps }]`;
     }
 
-    private variantMesh(block: BlockState, variant: BlockVariant): Mesh {
+    private variantMesh(block: BlockState, variant: BlockVariant): Object3D {
         if ( block.Name === 'air' || block.Name === 'void_air' || block.Name === 'cave_air' ) {
-            return new Mesh();
+            return new Group();
         }
 
         const model = this.getFlattenedModel(variant.model);
         if ( !model.elements ) {
-            throw Error(`Flattened model doesn't have elements tag. Cannot render: ${ this.stringifyBlockstate(block) }]`);
+            throw Error(`Flattened model doesn't have elements tag. Cannot render: ${ this.stringifyBlockState(block) }`);
         }
         if ( !model.textures ) {
-            throw Error(`Flattened model doesn't have textures. Cannot render: ${ this.stringifyBlockstate(block) }]`);
+            throw Error(`Flattened model doesn't have textures. Cannot render: ${ this.stringifyBlockState(block) }`);
         }
         // Delete unnecessary stuff
         delete model.textures['particle'];
@@ -198,56 +246,59 @@ export class ResourceManager {
         delete model.gui_light;
         delete model.ambientocclusion;
 
-        let unifiedMesh = new Mesh();
+        let blockGroup = new Group();
+        blockGroup.position.addScalar(0.5);
+
+        const dd = (fd: number, td: number) => ( fd + td - 1 ) / 2;
 
         for ( const elem of model.elements ) {
             const f = new Vector3().fromArray(elem.from).divideScalar(16);
             const t = new Vector3().fromArray(elem.to).divideScalar(16);
-            const box = new BoxGeometry(f.x - t.x, f.y - t.y, f.z - t.z);
-            const meshOffset = new Vector3(f.x - ( f.x - t.x ) / 2, f.y - ( f.y - t.y ) / 2, f.z - ( f.z - t.z ) / 2);
 
-            f.multiplyScalar(16);
-            t.multiplyScalar(16);
+            const elementGroup = new Group();
+            const elementOffset = new Vector3(dd(f.x, t.x), dd(f.y, t.y), dd(f.z, t.z));
+            elementGroup.position.add(elementOffset);
 
-            const uvs = [
-                ...this.getUVs(model, elem.faces.east, [ t.x, t.y, f.x, f.y ]),
-                ...this.getUVs(model, elem.faces.west, [ t.z, t.y, f.z, f.y ]),
-                ...this.getUVs(model, elem.faces.down, [ f.x, f.z, t.x, t.z ]),
-                ...this.getUVs(model, elem.faces.up, [ f.x, f.z, t.x, t.z ]),
-                ...this.getUVs(model, elem.faces.north, [ t.x, t.y, f.x, f.y ]),
-                ...this.getUVs(model, elem.faces.south, [ t.z, t.y, f.z, f.y ]),
-            ];
+            for ( const [ side, atts ] of Object.entries(elem.faces) ) {
+                const face = cast<Face>(atts);
+                const planeGeom = new PlaneGeometry(1, 1);
+                const planeMesh = new Mesh(planeGeom, this.atlas);
+                const uvs = this.getUVs(model, face, [ 0, 0, 16, 16 ]);
+                planeGeom.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
 
-            box.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
+                const lutRes = AXIS_ROT_OFFSET_LUT[cast<Side>(side)];
+                this.rotateOnPivot(planeMesh, Axis.Y, lutRes.yRot);
+                this.rotateOnPivot(planeMesh, Axis.X, lutRes.xRot);
+                this.rotateOnPivot(planeMesh, Axis.Z, face.rotation ?? 0);
+                planeMesh.position.set(lutRes.xOffset, lutRes.yOffset, lutRes.zOffset);
 
-            const mesh = new Mesh(box, this.atlas);
-            mesh.position.add(meshOffset);
+                elementGroup.add(planeMesh);
+            }
 
             const rot = elem.rotation;
             if ( rot != null ) {
+                console.log(rot);
                 const pivot = new Vector3().fromArray(rot.origin).divideScalar(16);
-                this.rotateOnPivot(mesh, rot.axis, rot.angle, pivot);
+                this.rotateOnPivot(elementGroup, rot.axis, rot.angle, pivot);
 
                 if ( rot.rescale ) {
                     const scaleVector = this.axisToScaleVector(rot.axis, rot.angle);
-                    mesh.scale.multiply(scaleVector);
+                    elementGroup.scale.multiply(scaleVector);
                 }
             }
 
-            unifiedMesh.add(mesh);
+            blockGroup.add(elementGroup);
         }
 
-        unifiedMesh.children.forEach(c => c.position.subScalar(0.5));
-        unifiedMesh.position.addScalar(0.5);
-
+        // Why does it need to be -ve angle? Don't ask. idk.
         if ( variant.y != null ) {
-            this.rotateOnPivot(unifiedMesh, Axis.Y, variant.y);
+            this.rotateOnPivot(blockGroup, Axis.Y, -variant.y);
         }
         if ( variant.x != null ) {
-            this.rotateOnPivot(unifiedMesh, Axis.X, variant.x);
+            this.rotateOnPivot(blockGroup, Axis.X, -variant.x);
         }
 
-        return unifiedMesh;
+        return blockGroup;
     }
 
     private pickOneVariant(variants: BlockVariant | BlockVariant[]): BlockVariant {

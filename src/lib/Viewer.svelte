@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Color, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
+    import { AxesHelper, Color, GridHelper, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
 
     import { ResourceManager } from './ResourceManager';
     import Stats from 'three/examples/jsm/libs/stats.module';
@@ -22,7 +22,9 @@
     const controls = new MapControls(camera, renderer.domElement);
     scene.background = new Color(0x999999);
 
-    camera.position.z = 10;
+    camera.position.z = -10;
+    camera.position.y = 15;
+    camera.position.x = 5;
 
     const manager = new ResourceManager();
     manager.load();
@@ -41,6 +43,8 @@
         reader.readAsArrayBuffer(file);
         reader.onload = () => {
             const mesh = litematicaRenderer.render(new Uint8Array(reader.result as ArrayBuffer));
+            scene.add(new GridHelper(100, 100));
+            scene.add(new AxesHelper(100));
             scene.add(mesh);
         };
     };
@@ -64,10 +68,10 @@
     {#if !isLitematicLoaded}
         <div class="z-10 absolute flex flex-col">
             <input
-                    class=""
-                    type="file"
-                    accept=".litematic"
-                    on:change={handleFileUpload}
+                class=""
+                type="file"
+                accept=".litematic"
+                on:change={handleFileUpload}
             />
         </div>
     {/if}
