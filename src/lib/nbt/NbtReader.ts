@@ -10,47 +10,47 @@ export class NbtReader {
         this.offset = 0;
     }
 
-    end(_unused: boolean = false) {
+    end(): number {
         throw Error('Invalid call');
     }
 
-    byte(_unused: boolean = false) {
+    byte(): number {
         const num = this.buffer.getInt8(this.offset);
         this.offset += 1;
         return num;
     }
 
-    short(_unused: boolean = false) {
+    short(): number {
         const num = this.buffer.getInt16(this.offset);
         this.offset += 2;
         return num;
     }
 
-    int(_unused: boolean = false) {
+    int(): number {
         const num = this.buffer.getInt32(this.offset);
         this.offset += 4;
         return num;
     }
 
-    long(_unused: boolean = false) {
+    long() {
         const num = this.buffer.getBigInt64(this.offset);
         this.offset += 8;
         return num;
     }
 
-    float(_unused: boolean = false) {
+    float() {
         const num = this.buffer.getFloat32(this.offset);
         this.offset += 4;
         return num;
     }
 
-    double(_unused: boolean = false) {
+    double() {
         const num = this.buffer.getFloat64(this.offset);
         this.offset += 8;
         return num;
     }
 
-    byteArray(_unused: boolean = false) {
+    byteArray() {
         const array: number[] = [];
         const length = this.int();
         for ( let i = 0; i < length; i++ ) {
@@ -59,7 +59,7 @@ export class NbtReader {
         return array;
     }
 
-    intArray(_unused: boolean = false) {
+    intArray() {
         const array: number[] = [];
         const length = this.int();
         for ( let i = 0; i < length; i++ ) {
@@ -68,7 +68,7 @@ export class NbtReader {
         return array;
     }
 
-    longArray(_unused: boolean = false) {
+    longArray() {
         const array: bigint[] = [];
         const length = this.int();
         for ( let i = 0; i < length; i++ ) {
@@ -78,7 +78,7 @@ export class NbtReader {
 
     }
 
-    string(_unused: boolean = false): string {
+    string(): string {
         const length = this.short();
         const codepoints = [];
 
@@ -114,7 +114,7 @@ export class NbtReader {
         return String.fromCharCode(...codepoints);
     }
 
-    list(simplified: boolean = false) {
+    list(simplified: boolean = false): [] | {} {
         const func = Tags[this.byte()];
         const length = this.int();
         const data = [];
@@ -130,7 +130,6 @@ export class NbtReader {
             const func = Tags[this.byte()];
             if ( func === 'end' )
                 break;
-
 
             if ( simplified ) {
                 data[this.string()] = this[func as keyof NbtReader](simplified);
