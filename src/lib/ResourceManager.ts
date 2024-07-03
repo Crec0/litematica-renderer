@@ -109,10 +109,11 @@ export class ResourceManager {
         atlasTex.magFilter = NearestFilter;
         atlasTex.minFilter = NearestFilter;
         atlasTex.needsUpdate = true;
+        atlasTex.flipY = false;
 
         return new MeshBasicMaterial({
             map: atlasTex,
-            side: BackSide,
+            side: FrontSide,
             alphaTest: 0.1,
             transparent: true,
         });
@@ -161,11 +162,11 @@ export class ResourceManager {
 
     private translateUV(textureName: string, uvs: FixedNumberArray<4>): FixedNumberArray<8> {
         const atlasOffset: FixedNumberArray<4> = cast(ATLAS_DATA[textureName as keyof typeof ATLAS_DATA]);
-        return [
-            ( atlasOffset[0] + uvs[0] ) / this.atlasWidth, ( this.atlasHeight - 16 - atlasOffset[1] + uvs[3] ) / this.atlasHeight,
-            ( atlasOffset[0] + uvs[2] ) / this.atlasWidth, ( this.atlasHeight - 16 - atlasOffset[1] + uvs[3] ) / this.atlasHeight,
-            ( atlasOffset[0] + uvs[0] ) / this.atlasWidth, ( this.atlasHeight - 16 - atlasOffset[1] + uvs[1] ) / this.atlasHeight,
-            ( atlasOffset[0] + uvs[2] ) / this.atlasWidth, ( this.atlasHeight - 16 - atlasOffset[1] + uvs[1] ) / this.atlasHeight,
+        return [ //1, 1, 0, 1, 1, 0, 0, 0
+            ( atlasOffset[0] + uvs[2] ) / this.atlasWidth, ( atlasOffset[1] + uvs[1] ) / this.atlasHeight,
+            ( atlasOffset[0] + uvs[0] ) / this.atlasWidth, ( atlasOffset[1] + uvs[1] ) / this.atlasHeight,
+            ( atlasOffset[0] + uvs[2] ) / this.atlasWidth, ( atlasOffset[1] + uvs[3] ) / this.atlasHeight,
+            ( atlasOffset[0] + uvs[0] ) / this.atlasWidth, ( atlasOffset[1] + uvs[3] ) / this.atlasHeight,
         ];
     }
 
