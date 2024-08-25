@@ -22,9 +22,9 @@
     const controls = new MapControls(camera, renderer.domElement);
     scene.background = new Color(0x999999);
 
-    camera.position.z = -10;
-    camera.position.y = 15;
-    camera.position.x = 5;
+    camera.position.z = -2;
+    camera.position.y = 3;
+    camera.position.x = 2;
 
     const manager = new ResourceManager();
     manager.load();

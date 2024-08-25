@@ -3,12 +3,13 @@ import BLOCK_MODELS from '../assets/block-models.json';
 import ATLAS_DATA from '../assets/atlas.json';
 import {
     BackSide,
-    Float32BufferAttribute,
+    DoubleSide,
+    Float32BufferAttribute, FrontSide,
     Group,
-    ImageLoader,
+    ImageLoader, LinearMipMapLinearFilter,
     Mesh,
     MeshBasicMaterial,
-    NearestFilter,
+    NearestFilter, NearestMipmapLinearFilter,
     Object3D,
     PlaneGeometry,
     SRGBColorSpace,
@@ -36,54 +37,6 @@ const SCALE_22_5 = 1 / Math.cos(( Math.PI / 8 ));
 const SCALE_45 = 1 / Math.cos(( Math.PI / 4 ));
 const MID_VECTOR = new Vector3(0.5, 0.5, 0.5);
 
-const AXIS_ROT_OFFSET_LUT = {
-    'north': {
-        xRot: 0,
-        yRot: 0,
-        xOffset: 0,
-        yOffset: 0,
-        zOffset: -0.5,
-    },
-    'south': {
-        xRot: 0,
-        yRot: 180,
-        xOffset: 0,
-        yOffset: 0,
-        zOffset: 0.5,
-    },
-    'east': {
-        xRot: 0,
-        yRot: -90,
-        xOffset: 0.5,
-        yOffset: 0,
-        zOffset: 0,
-    },
-    'west': {
-        xRot: 0,
-        yRot: 90,
-        xOffset: -0.5,
-        yOffset: 0,
-        zOffset: 0,
-    },
-    'up': {
-        xRot: 90,
-        yRot: 180,
-        xOffset: 0,
-        yOffset: 0.5,
-        zOffset: 0,
-    },
-    'down': {
-        xRot: -90,
-        yRot: 180,
-        xOffset: 0,
-        yOffset: -0.5,
-        zOffset: 0,
-    },
-} as const;
-
-type Side = keyof typeof AXIS_ROT_OFFSET_LUT;
-
-
 export class ResourceManager {
     private readonly blockDefinitions: Map<string, BlockDefinition> = new Map();
     private readonly blockModels: Map<string, BlockModel> = new Map();
@@ -108,12 +61,9 @@ export class ResourceManager {
         atlasTex.colorSpace = SRGBColorSpace;
         atlasTex.magFilter = NearestFilter;
         atlasTex.minFilter = NearestFilter;
-        atlasTex.needsUpdate = true;
-        atlasTex.flipY = false;
 
         return new MeshBasicMaterial({
             map: atlasTex,
-            side: FrontSide,
             alphaTest: 0.1,
             transparent: true,
         });
@@ -214,6 +164,7 @@ export class ResourceManager {
     }
 
     rotateOnPivot(object: Object3D, axis: Axis, angle: number, pivot: Vector3 = MID_VECTOR) {
+        if ( angle === 0 ) return;
         const radians = angle * DEG_TO_RAD;
         const axisVector = this.axisToAxisVector(axis);
         const pos = new Vector3().copy(pivot);
@@ -248,37 +199,80 @@ export class ResourceManager {
         delete model.ambientocclusion;
 
         let blockGroup = new Group();
-        blockGroup.position.addScalar(0.5);
-
-        const dd = (fd: number, td: number) => ( fd + td - 1 ) / 2;
 
         for ( const elem of model.elements ) {
             const f = new Vector3().fromArray(elem.from).divideScalar(16);
             const t = new Vector3().fromArray(elem.to).divideScalar(16);
 
+            const eW = Math.abs(t.x - f.x);
+            const eH = Math.abs(t.y - f.y);
+            const eD = Math.abs(t.z - f.z);
+
+            const dimsLut = {
+                north: [ eW, eH ],
+                south: [ eW, eH ],
+                east: [ eD, eH ],
+                west: [ eD, eH ],
+                up: [ eW, eD ],
+                down: [ eW, eD ],
+            } as const;
+
+            type Side = keyof typeof dimsLut;
+
             const elementGroup = new Group();
-            const elementOffset = new Vector3(dd(f.x, t.x), dd(f.y, t.y), dd(f.z, t.z));
-            elementGroup.position.add(elementOffset);
 
             for ( const [ side, atts ] of Object.entries(elem.faces) ) {
-                const face = cast<Face>(atts);
-                const planeGeom = new PlaneGeometry(1, 1);
+                const castedSide = cast<Side>(side);
+
+                const [ w, h ] = dimsLut[castedSide];
+
+                const planeGeom = new PlaneGeometry(w, h);
                 const planeMesh = new Mesh(planeGeom, this.atlas);
+
+                const face = cast<Face>(atts);
+
                 const uvs = this.getUVs(model, face, [ 0, 0, 16, 16 ]);
+                console.log(block.Name, face, side, uvs)
                 planeGeom.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
 
-                const lutRes = AXIS_ROT_OFFSET_LUT[cast<Side>(side)];
-                this.rotateOnPivot(planeMesh, Axis.Y, lutRes.yRot);
-                this.rotateOnPivot(planeMesh, Axis.X, lutRes.xRot);
-                this.rotateOnPivot(planeMesh, Axis.Z, face.rotation ?? 0);
-                planeMesh.position.set(lutRes.xOffset, lutRes.yOffset, lutRes.zOffset);
 
+                switch ( side ) {
+                case 'north':
+                    this.rotateOnPivot(planeMesh, Axis.Z, face.rotation ?? 0);
+                    planeMesh.position.set(f.x + w / 2, f.y + h / 2, t.z);
+                    break;
+                case 'south':
+                    this.rotateOnPivot(planeMesh, Axis.Y, 180);
+                    this.rotateOnPivot(planeMesh, Axis.Z, face.rotation ?? 0);
+                    planeMesh.position.set(f.x + w / 2, f.y + h / 2, f.z);
+                    break;
+                case 'west':
+                    this.rotateOnPivot(planeMesh, Axis.Y, 90);
+                    this.rotateOnPivot(planeMesh, Axis.Z, face.rotation ?? 0);
+                    planeMesh.position.set(t.x, f.y + h / 2, f.z + w / 2);
+                    break;
+                case 'east':
+                    this.rotateOnPivot(planeMesh, Axis.Y, -90);
+                    this.rotateOnPivot(planeMesh, Axis.Z, face.rotation ?? 0);
+                    planeMesh.position.set(f.x, f.y + h / 2, f.z + w / 2);
+                    break;
+                case 'up':
+                    this.rotateOnPivot(planeMesh, Axis.X, 90);
+                    this.rotateOnPivot(planeMesh, Axis.X, 180, new Vector3(0.5, 0.5, 0.5));
+                    this.rotateOnPivot(planeMesh, Axis.Z, face.rotation ?? 180);
+                    planeMesh.position.set(f.x + w / 2, f.y, f.z + h / 2);
+                    break;
+                case 'down':
+                    this.rotateOnPivot(planeMesh, Axis.X, -90);
+                    this.rotateOnPivot(planeMesh, Axis.Z, face.rotation ?? 180);
+                    planeMesh.position.set(f.x + w / 2, t.y, f.z + h / 2);
+                    break;
+                }
                 elementGroup.add(planeMesh);
             }
 
             const rot = elem.rotation;
             if ( rot != null ) {
-                console.log(rot);
                 const pivot = new Vector3().fromArray(rot.origin).divideScalar(16);
                 this.rotateOnPivot(elementGroup, rot.axis, rot.angle, pivot);
 
@@ -292,12 +286,12 @@ export class ResourceManager {
         }
 
         // Why does it need to be -ve angle? Don't ask. idk.
-        if ( variant.y != null ) {
-            this.rotateOnPivot(blockGroup, Axis.Y, -variant.y);
-        }
-        if ( variant.x != null ) {
-            this.rotateOnPivot(blockGroup, Axis.X, -variant.x);
-        }
+        // if ( variant.y != null ) {
+        //     this.rotateOnPivot(blockGroup, Axis.Y, -variant.y);
+        // }
+        // if ( variant.x != null ) {
+        //     this.rotateOnPivot(blockGroup, Axis.X, -variant.x);
+        // }
 
         return blockGroup;
     }
